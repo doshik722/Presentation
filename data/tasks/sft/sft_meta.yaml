@@ -1,0 +1,22 @@
+# Здесь записываем, какими моделями и по какой версии промпта составлены примеры для SFT.
+# Ответы сохраняются без правок: <модель>/answerN.txt; исправления по отдельной просьбе — <модель>/answerN_fix.txt
+# (заменяют презентации с теми же id); прочие файлы — история. Набор собирает `python -m presentation_rl.sft_data`.
+models:
+  claude: Claude Opus 5.5, высокий уровень рассуждений, веб-поиск
+  codex: Codex Sol 6.1, веб-поиск
+  gemini: Gemini 3.1 Pro Preview без инструмента форматирования JSON, веб-поиск
+prompts:
+  v1: sft_prompt_v1.txt  # пакеты batch1
+  v2: sft_prompt_v2.txt  # batch2: правила для #IMAGE и #DIAGRAM, разные типы визуала по смыслу
+  v3: sft_prompt_v3.txt  # batch3 у claude и codex: #PLAN обязателен первой строкой; строка «Картинки: есть / нет»
+  v4: sft_prompt_v4.txt  # batch3 у gemini (первый запуск, заменён): то же и объяснение строки «Тип темы»
+  v5: sft_prompt_v5.txt  # batch3 у gemini (повтор) и batch4: сколько слайдов, если число не задано
+  v6: sft_prompt.txt     # batch5–batch6: не больше 8 узлов в схеме, в дереве у узла один родитель
+offline: offline.json    # задания без картинок (пакеты 3–6), остальные — с картинками; все 90 — «Поиск: нет»
+batches:
+  batch1: {prompt: v1, date: 2026-10-15}
+  batch2: {prompt: v2, date: 2026-10-15}
+  batch3: {prompt: {claude: v3, codex: v3, gemini: v5}, date: 2026-10-15, fixes: {codex: [t026, t069, t087], gemini: [t056]}}
+  batch4: {prompt: v5, date: 2026-10-15, fixes: {claude: [t024, t068], codex: [t005]}}
+  batch5: {prompt: v6, date: 2026-10-15}
+  batch6: {prompt: v6, date: 2026-10-15, fixes: {gemini: [t043, t066]}}

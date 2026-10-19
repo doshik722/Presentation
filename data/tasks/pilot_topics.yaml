@@ -1,0 +1,36 @@
+# Здесь храним пробные темы для проверки промпта тезисов (key_points_prompt.txt).
+# Первые три совпадают с EXP-003 и EXP-004: по ним уже есть сгенерированные презентации.
+# Пачка из 8 тем — как в основном прогоне; курс в аудитории указан только у entropy.
+topics:
+  - id: gradient_descent
+    topic: Градиентный спуск и выбор шага обучения
+    audience: студенты второго курса технического вуза, знают производную и основы линейной алгебры
+    domain: technical
+  - id: photosynthesis
+    topic: "Фотосинтез: как растения превращают свет в химическую энергию"
+    audience: студенты первого курса биологического факультета
+    domain: technical
+  - id: serf_reform
+    topic: Отмена крепостного права в России
+    audience: учителя истории на курсах повышения квалификации
+    domain: humanities
+  - id: entropy
+    topic: Энтропия
+    audience: студенты третьего курса на курсе теории информации
+    domain: technical
+  - id: fourier
+    topic: Преобразование Фурье
+    audience: начинающие инженеры
+    domain: technical
+  - id: reformation
+    topic: Реформация в Европе XVI века
+    audience: студенты первого курса исторического факультета
+    domain: humanities
+  - id: social_contract
+    topic: Теория общественного договора
+    audience: студенты второго курса юридического факультета
+    domain: humanities
+  - id: inflation
+    topic: "Инфляция: причины и последствия"
+    audience: сотрудники финансового отдела компании
+    domain: technical

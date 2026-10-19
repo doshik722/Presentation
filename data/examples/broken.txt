@@ -1,0 +1,20 @@
+```dsl
+Вот ваша презентация о переобучении:
+#TITLE: Заголовок до первого слайда
+#SLIDE 1
+#TITLE: Что такое переобучение
+#TITLE: Второй заголовок
+#BULLET: Модель запоминает обучающие данные вместо общих закономерностей
+#SUBTITLE: Неизвестный тег
+#BULLET
+#BULLET:
+#CHART: type=bar; x=train,test; y=0.98
+#SLIDE
+#SLIDE
+#BULLET: Слайд без заголовка
+#CHART: type=bar; title=Точность; x=train,validation,test; y=0.98,0.81,0.79
+#PLOT: y = x^; x=0..1
+#DIAGRAM: type=flow; Данные -> Модель -> Оценка
+#IMAGE: график переобучения
+#TIMELINE: 2012 — пример
+```

@@ -1,0 +1,21 @@
+# Здесь исключаем локальные окружения, секреты, кэши и тяжёлые результаты запусков.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/
+.venv/
+.env
+.env.*
+!.env.example
+.idea/
+/models/
+runs/*
+!runs/README.md
+data/sources/*
+!data/sources/README.md
+
+# настройки синхронизации с сервером (личные)
+.vscode/sftp.json

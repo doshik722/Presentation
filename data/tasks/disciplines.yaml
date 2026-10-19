@@ -1,0 +1,40 @@
+# Здесь храним список дисциплин, из рабочих программ которых берутся темы заданий.
+# domain — тип тем дисциплины по их природе: technical — понятия, законы, модели, методы;
+# humanities — события, процессы и идеи в истории. Черновик, список правится автором.
+disciplines:
+  - {id: d01, name: Математический анализ, domain: technical}
+  - {id: d02, name: Линейная алгебра, domain: technical}
+  - {id: d03, name: Теория вероятностей и математическая статистика, domain: technical}
+  - {id: d04, name: Методы оптимизации, domain: technical}
+  - {id: d05, name: Машинное обучение, domain: technical}
+  - {id: d06, name: Алгоритмы и структуры данных, domain: technical}
+  - {id: d07, name: Базы данных, domain: technical}
+  - {id: d08, name: Компьютерные сети, domain: technical}
+  - {id: d09, name: Общая физика, domain: technical}
+  - {id: d10, name: Электротехника и электроника, domain: technical}
+  - {id: d11, name: Цифровая обработка сигналов, domain: technical}
+  - {id: d12, name: Общая и неорганическая химия, domain: technical}
+  - {id: d13, name: Биохимия, domain: technical}
+  - {id: d14, name: Генетика, domain: technical}
+  - {id: d15, name: Экология, domain: technical}
+  - {id: d16, name: Микроэкономика, domain: technical}
+  - {id: d17, name: Макроэкономика, domain: technical}
+  - {id: d18, name: Финансовый менеджмент, domain: technical}
+  - {id: d19, name: История России, domain: humanities}
+  - {id: d20, name: История Нового времени, domain: humanities}
+  - {id: d21, name: История Древнего мира, domain: humanities}
+  - {id: d22, name: История Средних веков, domain: humanities}
+  - {id: d23, name: Философия, domain: humanities}
+  - {id: d24, name: История политических и правовых учений, domain: humanities}
+  - {id: d25, name: Теория государства и права, domain: humanities}
+  - {id: d26, name: Конституционное право, domain: humanities}
+  - {id: d27, name: Социология, domain: humanities}
+  - {id: d28, name: Политология, domain: humanities}
+  - {id: d29, name: Культурология, domain: humanities}
+  - {id: d30, name: История искусств, domain: humanities}
+  - {id: d31, name: Русская литература XIX века, domain: humanities}
+  - {id: d32, name: Зарубежная литература, domain: humanities}
+  - {id: d33, name: Общая психология, domain: humanities}
+  - {id: d34, name: Педагогика, domain: humanities}
+  - {id: d35, name: Введение в языкознание, domain: humanities}
+  - {id: d36, name: История международных отношений, domain: humanities}

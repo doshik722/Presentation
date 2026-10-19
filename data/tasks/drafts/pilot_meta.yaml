@@ -1,0 +1,19 @@
+# Здесь записываем, какими моделями и с какими настройками составлены черновики пилотов.
+# Ответы сохранены без правок.
+topics: data/tasks/pilot_topics.yaml
+pilot2:
+  # 3 темы; промпт до добавления требования «key — коротко».
+  date: 2026-10-07
+  drafts:
+    claude/pilot.json: Claude Opus 5.5, высокий уровень рассуждений, веб-поиск
+    codex/pilot.json: Codex Sol 6.1, веб-поиск
+    gemini/pilot.json: Gemini 3.1 Pro Preview, веб-поиск
+pilot3:
+  # 8 тем одной пачкой; промпт — data/tasks/pilot_prompt.txt (версия с «key — коротко»).
+  # Сопоставление тезисов между моделями — pilot3_alignment.yaml.
+  date: 2026-10-12
+  drafts:
+    claude/pilot3.json: Claude Opus 5.5, высокий уровень рассуждений, веб-поиск
+    codex/pilot3.json: Codex Sol 6.1, веб-поиск
+    gemini/pilot3.json: Gemini 3.1 Pro Preview, веб-поиск
+    gemini/pilot3_notool.json: Gemini 3.1 Pro Preview без инструмента форматирования JSON, веб-поиск

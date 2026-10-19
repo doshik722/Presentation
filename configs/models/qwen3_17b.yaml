@@ -1,0 +1,6 @@
+# Здесь задаём второго небольшого кандидата для выбора базовой модели.
+name: qwen3_17b
+model_id: Qwen/Qwen3-1.7B
+revision: main
+chat_template_kwargs:
+  enable_thinking: false

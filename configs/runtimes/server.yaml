@@ -1,0 +1,6 @@
+# Здесь задаём профиль университетского сервера: NVIDIA V100, 32 ГБ; доступ через VPN, код переносим архивом.
+name: server
+device: cuda
+dtype: float16      # V100 не поддерживает bfloat16
+load_in_4bit: false # T-lite в float16 (~16 ГБ) помещается целиком
+max_memory: null

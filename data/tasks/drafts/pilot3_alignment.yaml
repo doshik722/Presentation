@@ -1,0 +1,95 @@
+# Здесь сопоставляем тезисы составителей в третьем пилоте (8 тем).
+# Каждая группа — одна часть темы; числа — номера тезисов (с нуля) в pilot3.json каждой модели.
+# gemini_notool — Gemini без инструмента форматирования JSON (gemini/pilot3_notool.json).
+# Тезис совпал с другой моделью, если в одной группе с ним есть хотя бы один её тезис;
+# совпадение — по главному предмету тезиса. Сопоставление — автор (13.10.2026).
+gradient_descent:
+  - {name: "идея антиградиента", claude: [0], codex: [], gemini: [0], gemini_notool: [0]}
+  - {name: "формула обновления", claude: [1], codex: [0], gemini: [1], gemini_notool: [1]}
+  - {name: "влияние величины шага", claude: [2], codex: [1], gemini: [2], gemini_notool: [2]}
+  - {name: "условие на шаг для L-гладких функций", claude: [3], codex: [2], gemini: [2], gemini_notool: [2]}
+  - {name: "скорость сходимости и обусловленность", claude: [4], codex: [2, 3], gemini: [], gemini_notool: []}
+  - {name: "поиск шага (Армихо)", claude: [5], codex: [4], gemini: [3], gemini_notool: []}
+  - {name: "постоянный и убывающий шаг", claude: [5], codex: [5], gemini: [], gemini_notool: [3]}
+  - {name: "критерии остановки", claude: [6], codex: [7], gemini: [], gemini_notool: []}
+  - {name: "стохастический спуск и мини-батчи", claude: [7], codex: [6], gemini: [5], gemini_notool: [4]}
+  - {name: "локальные минимумы и седловые точки", claude: [8], codex: [], gemini: [4], gemini_notool: []}
+  - {name: "импульс и адаптивные методы", claude: [8], codex: [], gemini: [5], gemini_notool: [5, 6]}
+photosynthesis:
+  - {name: "суммарное уравнение и роль", claude: [0], codex: [], gemini: [], gemini_notool: []}
+  - {name: "строение хлоропласта", claude: [1], codex: [0], gemini: [0], gemini_notool: []}
+  - {name: "пигменты и поглощение света", claude: [2], codex: [1], gemini: [1], gemini_notool: [0]}
+  - {name: "фотосистемы и окисление воды", claude: [3], codex: [2], gemini: [1], gemini_notool: [1]}
+  - {name: "транспорт электронов и НАДФН", claude: [4], codex: [3], gemini: [2], gemini_notool: [2, 3]}
+  - {name: "синтез АТФ и хемиосмос", claude: [5], codex: [4], gemini: [2], gemini_notool: [3]}
+  - {name: "цикл Кальвина", claude: [6], codex: [5], gemini: [3], gemini_notool: [4]}
+  - {name: "фотодыхание, C4 и CAM", claude: [7], codex: [6], gemini: [4, 5], gemini_notool: [5, 6]}
+  - {name: "ограничивающие факторы", claude: [8], codex: [7], gemini: [4], gemini_notool: [5]}
+serf_reform:
+  - {name: "причины и предпосылки", claude: [0], codex: [0], gemini: [0], gemini_notool: [0]}
+  - {name: "подготовка реформы", claude: [1], codex: [1], gemini: [1], gemini_notool: [1]}
+  - {name: "Манифест и личное освобождение", claude: [2], codex: [2], gemini: [2], gemini_notool: [2]}
+  - {name: "наделы, отрезки, уставные грамоты", claude: [3], codex: [3], gemini: [3], gemini_notool: [3]}
+  - {name: "временнообязанные и мировые посредники", claude: [4], codex: [3], gemini: [], gemini_notool: [4]}
+  - {name: "выкупная операция", claude: [5], codex: [4], gemini: [4], gemini_notool: [4]}
+  - {name: "община и самоуправление", claude: [6], codex: [5], gemini: [], gemini_notool: [5]}
+  - {name: "реакция крестьян и общества", claude: [7], codex: [], gemini: [], gemini_notool: []}
+  - {name: "категории крестьян и региональные различия", claude: [], codex: [6], gemini: [], gemini_notool: []}
+  - {name: "социально-экономические последствия", claude: [8], codex: [7], gemini: [5], gemini_notool: [6]}
+  - {name: "оценки историков", claude: [8], codex: [8], gemini: [6], gemini_notool: [6]}
+entropy:
+  - {name: "собственная информация", claude: [0], codex: [0], gemini: [0], gemini_notool: []}
+  - {name: "определение энтропии Шеннона", claude: [1], codex: [0], gemini: [1], gemini_notool: [0]}
+  - {name: "свойства энтропии", claude: [2], codex: [1], gemini: [2], gemini_notool: [1]}
+  - {name: "совместная и условная энтропия", claude: [3], codex: [2], gemini: [3], gemini_notool: [2]}
+  - {name: "взаимная информация", claude: [4], codex: [3], gemini: [4], gemini_notool: [3]}
+  - {name: "сжатие и теорема кодирования", claude: [5], codex: [4], gemini: [6], gemini_notool: [6]}
+  - {name: "пропускная способность канала", claude: [6], codex: [], gemini: [], gemini_notool: [6]}
+  - {name: "дивергенция и перекрёстная энтропия", claude: [7], codex: [7], gemini: [], gemini_notool: [5]}
+  - {name: "дифференциальная энтропия", claude: [8], codex: [6], gemini: [], gemini_notool: [4]}
+  - {name: "источники с памятью", claude: [], codex: [5], gemini: [5], gemini_notool: []}
+fourier:
+  - {name: "от ряда к интегралу, частотное представление", claude: [0], codex: [0], gemini: [0], gemini_notool: [0]}
+  - {name: "прямое и обратное преобразование", claude: [1], codex: [1], gemini: [], gemini_notool: [1]}
+  - {name: "амплитудный и фазовый спектры", claude: [2], codex: [2], gemini: [1], gemini_notool: [2]}
+  - {name: "спектры типовых сигналов", claude: [3], codex: [], gemini: [], gemini_notool: []}
+  - {name: "свойства (сдвиг, масштаб, дифференцирование)", claude: [4], codex: [3], gemini: [4], gemini_notool: [3]}
+  - {name: "свёртка и линейные системы", claude: [5], codex: [4], gemini: [4, 6], gemini_notool: [3]}
+  - {name: "равенство Парсеваля", claude: [6], codex: [5], gemini: [], gemini_notool: []}
+  - {name: "дискретизация и теорема Котельникова", claude: [7], codex: [7], gemini: [], gemini_notool: [7]}
+  - {name: "ДПФ и БПФ", claude: [8], codex: [6], gemini: [2, 3], gemini_notool: [4, 5]}
+  - {name: "окна и утечка спектра", claude: [], codex: [8], gemini: [], gemini_notool: []}
+  - {name: "оконное преобразование для нестационарных сигналов", claude: [], codex: [], gemini: [5], gemini_notool: [6]}
+reformation:
+  - {name: "причины", claude: [0], codex: [0], gemini: [0], gemini_notool: [0]}
+  - {name: "Лютер и его учение", claude: [1], codex: [1], gemini: [1], gemini_notool: [1]}
+  - {name: "Вормс и поддержка князей", claude: [2], codex: [1, 2], gemini: [1], gemini_notool: [1]}
+  - {name: "радикальная Реформация и Крестьянская война", claude: [3], codex: [4], gemini: [2], gemini_notool: [3]}
+  - {name: "Аугсбургский мир и политические итоги", claude: [4], codex: [2], gemini: [6], gemini_notool: [7]}
+  - {name: "Цвингли и Кальвин", claude: [5], codex: [3], gemini: [3], gemini_notool: [2]}
+  - {name: "Англия", claude: [6], codex: [5], gemini: [4], gemini_notool: [4]}
+  - {name: "религиозные войны", claude: [7], codex: [6], gemini: [6], gemini_notool: [6]}
+  - {name: "Контрреформация", claude: [8], codex: [7], gemini: [5], gemini_notool: [5]}
+  - {name: "последствия и оценки", claude: [9], codex: [8], gemini: [6], gemini_notool: [7]}
+social_contract:
+  - {name: "истоки, естественное право и состояние", claude: [0], codex: [0, 1], gemini: [0], gemini_notool: [0, 1]}
+  - {name: "Гоббс", claude: [1], codex: [2], gemini: [1], gemini_notool: [2]}
+  - {name: "Локк", claude: [2], codex: [3], gemini: [2], gemini_notool: [3]}
+  - {name: "Руссо", claude: [3], codex: [4], gemini: [3], gemini_notool: [4]}
+  - {name: "сравнение моделей договора", claude: [4], codex: [], gemini: [], gemini_notool: [1]}
+  - {name: "влияние на конституционализм", claude: [5], codex: [5], gemini: [], gemini_notool: [5]}
+  - {name: "критика теории", claude: [6], codex: [7], gemini: [5], gemini_notool: []}
+  - {name: "Ролз", claude: [7], codex: [6], gemini: [4], gemini_notool: [6]}
+inflation:
+  - {name: "измерение инфляции", claude: [0], codex: [0], gemini: [3], gemini_notool: [0]}
+  - {name: "виды по темпам", claude: [1], codex: [], gemini: [], gemini_notool: [1]}
+  - {name: "инфляция спроса", claude: [2], codex: [1], gemini: [1], gemini_notool: [2]}
+  - {name: "инфляция издержек", claude: [3], codex: [2], gemini: [1], gemini_notool: [3]}
+  - {name: "денежные причины", claude: [4], codex: [3], gemini: [0], gemini_notool: []}
+  - {name: "ожидания и индексация", claude: [5], codex: [4], gemini: [2], gemini_notool: [4]}
+  - {name: "номинальные и реальные ставки", claude: [6], codex: [7], gemini: [4], gemini_notool: []}
+  - {name: "перераспределение доходов", claude: [7], codex: [5], gemini: [], gemini_notool: []}
+  - {name: "последствия для финансов компании", claude: [8], codex: [6], gemini: [], gemini_notool: [6]}
+  - {name: "денежно-кредитная политика", claude: [9], codex: [8], gemini: [], gemini_notool: [5]}
+  - {name: "инвестиционные решения", claude: [], codex: [7], gemini: [5], gemini_notool: []}
+  - {name: "хеджирование рисков", claude: [], codex: [], gemini: [6], gemini_notool: [7]}

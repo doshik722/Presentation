@@ -1,0 +1,48 @@
+# Здесь храним три демонстрационных задания для отладки отбора моделей.
+# Расширим набор до 20–30 заданий и отделим его от итогового теста PPO/GRPO.
+tasks:
+  - id: gradient_descent
+    topic: Градиентный спуск и выбор шага обучения
+    audience: Студенты второго курса, знакомые с производной
+    requirements:
+      min_slides: 3
+      max_slides: 5
+      max_words_per_slide: 80
+    key_points:
+      - id: mechanism
+        description: Объясняем направление антиградиента и смысл правила обновления.
+      - id: learning_rate
+        description: Сравниваем слишком маленький и слишком большой шаг.
+      - id: limitations
+        description: Объясняем ограничения на невыпуклых задачах и не обещаем глобальный минимум.
+    source_packet: []
+  - id: overfitting
+    topic: Переобучение и корректная проверка модели
+    audience: Начинающие специалисты по анализу данных
+    requirements:
+      min_slides: 3
+      max_slides: 5
+      max_words_per_slide: 80
+    key_points:
+      - id: generalization
+        description: Различаем качество на обучении и на новых данных.
+      - id: split
+        description: Объясняем назначение train, validation и test без настройки по test.
+      - id: example
+        description: Приводим пример утечки данных и объясняем её последствия.
+    source_packet: []
+  - id: historical_sources
+    topic: Как проверять достоверность исторического источника
+    audience: Студенты первого курса гуманитарного направления
+    requirements:
+      min_slides: 3
+      max_slides: 5
+      max_words_per_slide: 80
+    key_points:
+      - id: provenance
+        description: Учитываем автора, время создания и происхождение источника.
+      - id: bias
+        description: Объясняем влияние целей автора и контекста.
+      - id: comparison
+        description: Показываем, как сопоставлять независимые источники и обозначать неопределённость.
+    source_packet: []

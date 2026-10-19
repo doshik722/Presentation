@@ -1,0 +1,8 @@
+# Здесь будем фиксировать настройки PPO; этот шаблон пока не запускает обучение.
+algorithm: ppo
+implemented: false
+adaptation: lora
+lora_rank: 16
+learning_rate: null
+critic_architecture: null
+reward_weights: {}

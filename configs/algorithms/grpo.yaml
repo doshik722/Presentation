@@ -1,0 +1,8 @@
+# Здесь будем фиксировать настройки GRPO; этот шаблон пока не запускает обучение.
+algorithm: grpo
+implemented: false
+adaptation: lora
+lora_rank: 16
+learning_rate: null
+group_size: 4
+reward_weights: {}

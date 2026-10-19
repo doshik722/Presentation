@@ -1,0 +1,5 @@
+# Здесь задаём текстовую Qwen3-4B; пригодность оборудования проверяем отдельно.
+name: qwen3_4b_instruct
+model_id: Qwen/Qwen3-4B-Instruct-2507
+revision: main
+chat_template_kwargs: {}

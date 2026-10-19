@@ -1,0 +1,15 @@
+Примеров: 90; ошибок: 0; замечаний: 14
+Замечание: codex/batch1/t014: нет #PLAN
+Замечание: codex/batch1/t029: нет #PLAN
+Замечание: codex/batch1/t032: нет #PLAN
+Замечание: codex/batch1/t054: нет #PLAN
+Замечание: codex/batch1/t071: нет #PLAN
+Замечание: codex/batch2/t027: нет #PLAN
+Замечание: codex/batch2/t049: нет #PLAN
+Замечание: codex/batch2/t053: нет #PLAN
+Замечание: codex/batch2/t070: нет #PLAN
+Замечание: codex/batch2/t089: нет #PLAN
+Замечание: gemini/batch1/t044: нет #PLAN
+Замечание: gemini/batch1/t073: нет #PLAN
+Замечание: gemini/batch2/t039: нет #PLAN
+Замечание: gemini/batch2/t074: нет #PLAN

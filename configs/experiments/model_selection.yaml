@@ -1,0 +1,21 @@
+# Здесь определяем первый эксперимент выбора модели без RL-дообучения.
+experiment_id: EXP-001
+description: Сравниваем исходные модели на одинаковых русскоязычных заданиях.
+tasks: data/model_selection/tasks.yaml
+models:
+  - configs/models/qwen3_06b.yaml
+  - configs/models/qwen3_17b.yaml
+  # Добавим крупных кандидатов после проверки времени и памяти.
+  # - configs/models/qwen3_4b.yaml
+  # - configs/models/tlite_21.yaml
+runtime: configs/runtimes/local.yaml
+seeds: [42, 43]
+generation:
+  max_new_tokens: 2048
+  do_sample: true
+  temperature: 0.7
+  top_p: 0.8
+  top_k: 20
+# Не предоставляем браузер в одношаговом отборе моделей.
+# Фиксированные материалы при необходимости помещаем в source_packet задания.
+resource_mode: disabled

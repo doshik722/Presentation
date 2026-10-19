@@ -1,0 +1,6 @@
+# Здесь задаём профиль локального компьютера: GTX 1660 Super, 6 ГБ; bf16 карта не поддерживает.
+name: local
+device: auto        # auto: CUDA → XPU → CPU; можно указать явно: cuda / xpu / cpu
+dtype: auto         # auto: bf16 при поддержке, иначе fp16; на 1660 отдельно проверяем NaN в fp16
+load_in_4bit: false
+max_memory: null

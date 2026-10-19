@@ -1,0 +1,27 @@
+# Здесь описываем пакет проекта и отдельно подключаем зависимости для моделей и обучения.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "presentation-rl"
+version = "0.1.0"
+description = "Исследуем подготовку презентаций агентами PPO и GRPO."
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6", "python-pptx>=1.0", "matplotlib>=3.7", "numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "nbformat>=5", "jupyterlab>=4"]
+models = ["torch>=2.2", "transformers>=4.51", "accelerate>=1"]
+quantization = ["bitsandbytes>=0.45"]
+training = ["trl", "peft"]
+
+[project.scripts]
+presentation-rl = "presentation_rl.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

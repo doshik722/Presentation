@@ -1,0 +1,5 @@
+# Здесь задаём T-lite-2.1 как кандидата для русскоязычных презентаций и инструментов.
+name: tlite_21
+model_id: t-tech/T-lite-it-2.1
+revision: main
+chat_template_kwargs: {}
