@@ -70,6 +70,8 @@ class FakeApi:
         self.calls += 1
         lang = url.split("//")[1].split(".")[0]
         params = dict(urllib.parse.parse_qsl(url.split("?", 1)[1]))
+        if params.get("action") == "parse":  # HTML статьи для таблиц: в этих тестах таблиц нет
+            return {"parse": {"text": ""}}
         if params.get("generator") == "search":
             key = ("search", lang, params["gsrsearch"])
         elif "exsectionformat" in params:

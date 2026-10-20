@@ -6,7 +6,8 @@
 ``WIKI_CONTACT``), запросы по одному с паузой, повтор с ожиданием при перегрузке (429, 5xx, maxlag).
 
 Статья хранится по разделам: введение — раздел 0, дальше разделы в порядке текста; служебные разделы
-(«Примечания», «Литература», «Ссылки» и т. п.) отбрасываются вместе с подразделами.
+(«Примечания», «Литература», «Ссылки» и т. п.) отбрасываются вместе с подразделами. Текст — простой текст API,
+таблицы и карточка статьи — из HTML той же правки, в конце своего раздела (``wiki_tables``).
 """
 from __future__ import annotations
 
@@ -19,6 +20,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass, field
 from typing import Callable
+
+from .wiki_tables import align_headings, html_tables
 
 USER_AGENT = "presentation-rl/0.1 (diploma research; contact: {contact})"
 
@@ -137,14 +140,28 @@ class SearchHit:
     snippet: str
 
 
-def split_sections(text: str) -> list[Section]:
-    """Делит простой текст статьи с заголовками вида ``== Раздел ==`` на разделы; служебные отбрасывает."""
+def text_headings(text: str) -> list[str]:
+    """Все заголовки простого текста статьи по порядку, включая служебные."""
+    return [m.group(2).strip() for m in (_HEADING_RE.match(line.strip()) for line in text.splitlines()) if m]
+
+
+def split_sections(text: str, tables: dict[int, list[str]] | None = None) -> list[Section]:
+    """Делит простой текст статьи с заголовками вида ``== Раздел ==`` на разделы; служебные отбрасывает.
+
+    ``tables`` — тексты таблиц по номеру заголовка в тексте (с 1, считая служебные; 0 — введение): дописываются
+    в конец своего раздела (``wiki_tables``).
+    """
+    tables = tables or {}
     sections = [Section(0, 1, "", "")]
     lines: list[str] = []
     skip_level: int | None = None  # уровень служебного раздела, подразделы которого тоже пропускаем
+    current: int | None = 0  # номер заголовка текущего раздела; None — служебный раздел, текст не сохраняем
+    number = 0
 
     def close() -> None:
-        sections[-1].text = clean_math("\n".join(lines)).strip()
+        if current is not None:
+            parts = [clean_math("\n".join(lines)).strip()] + tables.get(current, [])
+            sections[-1].text = "\n\n".join(p for p in parts if p)
         lines.clear()
 
     for line in text.splitlines():
@@ -153,19 +170,20 @@ def split_sections(text: str) -> list[Section]:
             if skip_level is None:
                 lines.append(line)
             continue
+        number += 1
         level = len(match.group(1)) - 1
         heading = match.group(2).strip()
         if skip_level is not None and level > skip_level:
             continue
+        close()
         skip_level = None
         if heading.lower() in SKIP_HEADINGS:
-            close()
             skip_level = level
+            current = None
             continue
-        close()
+        current = number
         sections.append(Section(len(sections), level, heading, ""))
-    if skip_level is None:
-        close()
+    close()
     # Пустые разделы (заголовок без текста и без подразделов с текстом) не нужны модели.
     kept = [s for i, s in enumerate(sections) if s.text or s.index == 0 or _has_text_below(sections, i)]
     for new_index, section in enumerate(kept):
@@ -306,8 +324,19 @@ class WikiClient:
         if page.get("missing") or "disambiguation" in page.get("pageprops", {}):
             return None
         revid = page.get("revisions", [{}])[0].get("revid", 0)
+        extract = page.get("extract", "")
+        # Таблиц и карточки в простом тексте нет — берём их из HTML той же правки (wiki_tables).
+        params = {"action": "parse", "prop": "text", "disableeditsection": "1", "disabletoc": "1"}
+        params.update({"oldid": str(revid)} if revid else {"page": page["title"], "redirects": "1"})
+        found = html_tables(self.get(lang, params).get("parse", {}).get("text", ""))
+        numbers = align_headings(found.headings, text_headings(extract))
+        tables: dict[int, list[str]] = {}
+        for count, table in found.tables:
+            if count and found.headings[count - 1].lower() in SKIP_HEADINGS:
+                continue  # таблица служебного раздела — даже если его заголовок не нашёлся в простом тексте
+            tables.setdefault(numbers[count - 1] if count else 0, []).append(table)
         return Article(lang, page["pageid"], page["title"], revid, page.get("fullurl", ""),
-                       split_sections(page.get("extract", "")))
+                       split_sections(extract, tables))
 
     def langlinks(self, lang: str, titles: list[str], target: str) -> dict[str, str]:
         """Названия тех же статей на языке ``target``: {название на lang: название на target}."""

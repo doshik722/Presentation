@@ -5,7 +5,8 @@
 
 - ``searches.jsonl`` — выдача поиска: язык, запрос, лимит, язык межъязыковых ссылок и статьи (без текста);
 - ``pages.jsonl`` — статьи по названиям (введение, номер правки, URL); нет статьи — ``page: null``;
-- ``articles.jsonl`` — статьи целиком по разделам (тот же формат, что у пилотного корпуса, его можно скопировать сюда).
+- ``articles.jsonl`` — статьи целиком по разделам, с таблицами (``tables: true``); записи без таблиц, сохранённые
+  раньше, не читаются — такие статьи запрашиваются заново.
 
 Так роллауты одного задания видят одну и ту же выдачу, а повторные прогоны и сравнения моделей идут по тем же
 ответам. ``client=None`` — только сохранённое: промах — ошибка ``CacheMiss`` (для точного воспроизведения).
@@ -41,6 +42,8 @@ class WikiCache:
             page = PageInfo(**record["page"]) if record["page"] else None
             self.page_infos[(record["lang"], record["requested"])] = page
         for record in self._read("articles.jsonl"):
+            if not record.get("missing") and not record.get("tables"):
+                continue  # сохранено до того, как в статьи добавились таблицы (20.10.2026) — запросим заново
             if record.get("missing"):
                 self.articles[(record["lang"], record["requested"])] = None
                 continue
@@ -97,5 +100,5 @@ class WikiCache:
                     self._append("articles.jsonl", {"lang": lang, "requested": title, "missing": True})
                 else:
                     self.articles[(lang, article.title)] = article
-                    self._append("articles.jsonl", article.to_json() | {"requested": title})
+                    self._append("articles.jsonl", article.to_json() | {"requested": title, "tables": True})
             return self.articles[(lang, title)]

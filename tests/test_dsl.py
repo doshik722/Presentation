@@ -214,6 +214,11 @@ def test_plot_number_with_exponent_is_kept():
     assert ast.dump(tree) == ast.dump(ast.parse("2e-3*x", mode="eval"))
 
 
+def test_source_with_several_ids():
+    deck = parse("#SLIDE\n#TITLE: Слайд\n#SOURCE: d1, d2#3; d4\n#SOURCE: d5")
+    assert deck.errors == [] and deck.slides[0].sources == ["d1", "d2#3", "d4", "d5"]
+
+
 def test_compile_expression_rejects_code():
     with pytest.raises(DSLValueError):
         compile_expression("().__class__")

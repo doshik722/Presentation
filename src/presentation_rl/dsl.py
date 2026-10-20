@@ -218,8 +218,8 @@ def parse(text: str, limits: ParseLimits | None = None) -> Deck:
             current.title_line = number
         elif tag == "NOTES":
             current.notes.append(value)
-        elif tag == "SOURCE":
-            current.sources.append(value)
+        elif tag == "SOURCE":  # несколько id через запятую или «;» — несколько источников
+            current.sources.extend(ref for ref in (part.strip() for part in re.split(r"[,;]", value)) if ref)
         else:
             if len(current.elements) >= limits.max_elements_per_slide:
                 error("limit_exceeded", f"больше {limits.max_elements_per_slide} элементов на слайде")
