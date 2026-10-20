@@ -1,4 +1,5 @@
 # Здесь проверяем разбор DSL на корректных, испорченных и оборванных примерах из data/examples.
+import ast
 from pathlib import Path
 
 import pytest
@@ -180,7 +181,6 @@ def test_plot_is_parsed():
         "y = x^; x=0..1",  # незаконченное выражение
         "y = __import__('os'); x=0..1",  # чужой код
         "y = x.real; x=0..1",  # атрибуты запрещены
-        "y = 2x; x=0..1",  # неявное умножение
         "y = 5; x=0..1",  # не зависит от x
         "y = sin; x=0..1",  # функция без аргумента
         "y = x^2",  # нет диапазона
@@ -191,6 +191,27 @@ def test_plot_is_parsed():
 def test_bad_plots(value):
     deck, element = first_element("#PLOT: " + value)
     assert element is None and deck.errors[0].code == "bad_value"
+
+
+@pytest.mark.parametrize(
+    "short, full",
+    [
+        ("1.2 - 0.15x", "1.2 - 0.15*x"),
+        ("1 - exp(-0.4x)", "1 - exp(-0.4*x)"),
+        ("3sin(x) + 2 x", "3*sin(x) + 2*x"),
+        ("2(x+1)(x-1)", "2*(x+1)*(x-1)"),
+        ("x(1-x)", "x*(1-x)"),
+        ("2pi x", "2*pi*x"),
+        ("2e^x", "2*e^x"),
+    ],
+)
+def test_plot_implicit_multiplication(short, full):
+    assert ast.dump(compile_expression(short)) == ast.dump(compile_expression(full))
+
+
+def test_plot_number_with_exponent_is_kept():
+    tree = compile_expression("2e-3*x")
+    assert ast.dump(tree) == ast.dump(ast.parse("2e-3*x", mode="eval"))
 
 
 def test_compile_expression_rejects_code():

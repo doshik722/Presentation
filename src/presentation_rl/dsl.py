@@ -42,6 +42,13 @@ CHART_TYPES = ("bar", "line", "pie")
 DIAGRAM_TYPES = ("flow", "tree")
 PLOT_FUNCTIONS = ("sin", "cos", "tan", "exp", "log", "sqrt", "abs")
 PLOT_CONSTANTS = ("pi", "e")
+# Неявное умножение в #PLOT: «0.15x», «3sin(x)», «2(x+1)», «(x+1)(x-1)», «x(1-x)» читаются со знаком *.
+# Запись числа вроде «2e-3» не трогаем: это число, а не 2·e − 3.
+_IMPLICIT_MUL_RE = re.compile(
+    r"(?<=[\d)])\s*(?=[a-zA-Z(])(?!e[+-]?\d)"  # после числа или «)»: 0.15x, 3sin(x), 2(x+1), (x+1)(x-1)
+    r"|(?<=(?<![a-zA-Z])x)\s*(?=[a-zA-Z(])"  # после x: x(1-x), x sin(x)
+    r"|(?<=(?<![a-zA-Z])pi)\s*(?=[a-zA-Z(])"  # после pi: 2pi x
+)
 
 _TAG_RE = re.compile(r"^#([A-Za-z_]+)(.*)$")
 _FENCE_RE = re.compile(r"^```")
@@ -387,9 +394,10 @@ def _parse_plot(value: str) -> tuple[dict[str, Any], list[tuple[str, str]]]:
 def compile_expression(expression: str) -> ast.Expression:
     """Проверяет выражение #PLOT и возвращает его дерево; ничего не выполняет.
 
-    Разрешены числа, x, pi, e, операции + - * / ^, скобки и функции из PLOT_FUNCTIONS.
+    Разрешены числа, x, pi, e, операции + - * / ^, скобки и функции из PLOT_FUNCTIONS; знак умножения
+    можно опускать (``0.15x``, ``2(x+1)``).
     """
-    source = expression.replace("^", "**")
+    source = _IMPLICIT_MUL_RE.sub("*", expression).replace("^", "**")
     try:
         tree = ast.parse(source, mode="eval")
     except SyntaxError as exc:
