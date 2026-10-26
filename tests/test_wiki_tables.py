@@ -110,3 +110,13 @@ def test_service_section_tables_dropped_even_if_headings_do_not_match():
 
     article = WikiClient(fetch=fetch, min_interval=0).article("ru", "X")
     assert "служебная таблица" not in article.sections[0].text and "Гидроагрегаты" in article.sections[0].text
+
+
+def test_several_values_in_one_cell_are_separated():
+    html = """<table class="wikitable"><tr><th>Год</th><th>Лауреаты</th></tr>
+<tr><td>1958</td><td><div class="plainlist"><ul><li><a>Павел Черенков</a></li><li><a>Игорь Тамм</a></li></ul></div></td></tr>
+<tr><td>1964</td><td><p>Николай Басов</p><p>Александр Прохоров</p></td></tr>
+<tr><td>1975</td><td><a>Андрей Сахаров</a><br><small>премия мира</small></td></tr></table>"""
+    (_, text), = html_tables(html).tables
+    assert text.splitlines()[1:] == ["Год | Лауреаты", "1958 | Павел Черенков; Игорь Тамм",
+                                     "1964 | Николай Басов; Александр Прохоров", "1975 | Андрей Сахаров; премия мира"]

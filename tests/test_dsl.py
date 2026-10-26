@@ -219,6 +219,12 @@ def test_source_with_several_ids():
     assert deck.errors == [] and deck.slides[0].sources == ["d1", "d2#3", "d4", "d5"]
 
 
+def test_flow_diagram_accepts_unicode_arrow():
+    _, diagram = first_element("#DIAGRAM: type=flow; Древняя Русь →|раздробленность| Московское царство → Империя")
+    assert diagram.data["nodes"] == ["Древняя Русь", "Московское царство", "Империя"]
+    assert diagram.data["edges"][0]["label"] == "раздробленность"
+
+
 def test_compile_expression_rejects_code():
     with pytest.raises(DSLValueError):
         compile_expression("().__class__")

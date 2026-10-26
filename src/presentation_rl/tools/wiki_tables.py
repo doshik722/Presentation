@@ -26,6 +26,7 @@ _DROP_CLASSES = {"reference", "mw-editsection", "sortkey", "noprint", "mw-cite-b
                  "mw-empty-elt", "toc"}
 _DROP_TAGS = {"style", "script", "img"}
 _SPACE = re.compile(r"\s+")
+_BLOCKS = {"p", "div", "li", "dd", "dt"}  # блоки внутри ячейки — отдельные значения
 
 
 @dataclass
@@ -74,7 +75,8 @@ def _hidden(node: _Node) -> bool:
 
 
 def _text(node: _Node) -> str:
-    """Видимый текст узла: формулы — LaTeX в $…$, <br> — «; »."""
+    """Видимый текст узла: формулы — LaTeX в $…$; перенос строки, абзацы и пункты списка — через «; »
+    (иначе несколько имён в одной ячейке склеиваются через пробел)."""
     if "mwe-math-element" in node.classes:
         tex = _find(node, lambda n: n.tag == "annotation" and n.attrs.get("encoding") == "application/x-tex")
         if tex is not None:
@@ -90,7 +92,10 @@ def _text(node: _Node) -> str:
             parts.append("; ")
         elif not _hidden(child):
             text = _text(child)
-            parts.append(f" {text} " if child.tag in ("p", "div", "li", "table", "tr") else text)
+            if child.tag in _BLOCKS:
+                parts.append(f"; {text}; ")
+            else:
+                parts.append(f" {text} " if child.tag in ("table", "tr") else text)
     return "".join(parts)
 
 

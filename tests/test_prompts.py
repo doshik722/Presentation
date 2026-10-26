@@ -32,3 +32,14 @@ def test_example_presentations_parse_without_errors():
         lines = [line for line in example.splitlines() if line.startswith("#") and not line.startswith("##")]
         deck = parse("\n".join(lines))
         assert deck.errors == [] and deck.warnings == [] and len(deck.slides) == slides
+
+
+def test_no_images_mode_does_not_mention_images():
+    for search in (True, False):
+        with_images = system_prompt(PresentationRequest("Фотоэффект", search=search))
+        without = system_prompt(PresentationRequest("Фотоэффект", search=search, images=False))
+        assert "#IMAGE" in with_images and "Картинки —" in with_images
+        assert "#IMAGE" not in without and "картин" not in without.lower()
+        example = without[without.index("## Пример"):]
+        lines = [line for line in example.splitlines() if line.startswith("#") and not line.startswith("##")]
+        assert parse("\n".join(lines)).errors == []

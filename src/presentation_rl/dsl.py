@@ -53,7 +53,7 @@ _IMPLICIT_MUL_RE = re.compile(
 _TAG_RE = re.compile(r"^#([A-Za-z_]+)(.*)$")
 _FENCE_RE = re.compile(r"^```")
 # Стрелка потока: -> или -->, с необязательной подписью в стиле Mermaid: -->|текст|
-_ARROW_RE = re.compile(r"\s*-{1,2}>\s*(?:\|([^|]*)\|)?\s*")
+_ARROW_RE = re.compile(r"\s*(?:-{1,2}>|→)\s*(?:\|([^|]*)\|)?\s*")  # стрелка: ->, --> или →
 _QUOTE_SPLIT_RE = re.compile(r"\s+(?:—|--|–)\s+")
 _TIMELINE_SPLIT_RE = re.compile(r"\s+(?:—|–|-)\s+")
 _NODE_FORBIDDEN = ("->", ">", "|", ";", ",")
