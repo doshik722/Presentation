@@ -115,6 +115,47 @@ def evaluate_expression(expression: str, x: np.ndarray) -> np.ndarray:
     return np.broadcast_to(np.asarray(result, dtype=float), x.shape)
 
 
+PLOT_POINTS = 600
+UNDEFINED_SHARE = 0.5  # функция не определена больше чем на половине отрезка — ошибка (график всё равно рисуется)
+FLAT_DEVIATION = 0.02  # кривая отходит от прямой между концами меньше чем на 2% рамки — выглядит прямой
+OUTLIER_SPAN = 0.03  # 90% точек занимают меньше 3% высоты рамки — выброс сжал график в линию
+
+
+def plot_points(expression: str, x_min: float, x_max: float) -> tuple[np.ndarray, np.ndarray]:
+    """Точки графика: x на отрезке, y — значения функции (nan там, где она не определена)."""
+    x = np.linspace(x_min, x_max, PLOT_POINTS)
+    y = evaluate_expression(expression, x).astype(float)
+    return x, np.where(np.isfinite(y), y, np.nan)
+
+
+def plot_issue(x: np.ndarray, y: np.ndarray) -> str | None:
+    """Чем плох график (``docs/decisions.md``, раздел 7): ``undefined`` — функция не определена на большей части
+    отрезка; ``flat`` — график выглядит горизонтальной или наклонной прямой, хотя функция не линейная, или выброс
+    сжал всю кривую в линию; ``None`` — график нормальный.
+
+    Прямизна меряется в координатах рамки: обе оси растянуты на рамку, как их рисует matplotlib, поэтому пологая,
+    наклонная и крутая линии проверяются одним правилом. Честная прямая (линейная функция, U = IR) — не ошибка:
+    у неё отклонение от прямой нулевое, а не просто малое.
+    """
+    finite = np.isfinite(y)
+    if finite.mean() < UNDEFINED_SHARE:
+        return "undefined"
+    xs, ys = x[finite], y[finite]
+    span = float(ys.max() - ys.min())
+    if span <= 1e-9 * max(1.0, float(np.abs(ys).max())):
+        return "flat"  # постоянная
+    q5, q95 = np.quantile(ys, [0.05, 0.95])
+    if (q95 - q5) / span < OUTLIER_SPAN:
+        return "flat"
+    xn = (xs - xs[0]) / (xs[-1] - xs[0])
+    yn = (ys - ys.min()) / span
+    dx, dy = 1.0, float(yn[-1] - yn[0])
+    deviation = float(np.abs(dy * xn - dx * (yn - yn[0])).max()) / math.hypot(dx, dy)
+    if 1e-6 < deviation < FLAT_DEVIATION:
+        return "flat"
+    return None
+
+
 def render_plot(
     expression: str,
     x_min: float,
@@ -126,12 +167,9 @@ def render_plot(
     text_color: str = "#1F2A44",
 ) -> tuple[int, int]:
     """Рисует график функции y(x). Возвращает размер PNG в пикселях."""
-    x = np.linspace(x_min, x_max, 600)
-    y = evaluate_expression(expression, x).astype(float)
-    finite = np.isfinite(y)
-    if finite.mean() < 0.5:
-        raise RenderError("на большей части диапазона функция не определена")
-    y = np.where(finite, y, np.nan)
+    x, y = plot_points(expression, x_min, x_max)
+    if np.isfinite(y).sum() < 2:  # рисовать нечего; неудачные, но видимые графики оценивает plot_issue
+        raise RenderError("на отрезке функция не определена")
 
     fig, ax = plt.subplots(figsize=size_in)
     try:

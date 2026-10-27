@@ -56,6 +56,9 @@ class _Doc:
         return f"d{self.number}"
 
 
+REPEAT_MESSAGE = "Такой запрос уже был, результат выше."
+
+
 class WikiTools:
     def __init__(self, cache: WikiCache, max_calls: int = 10, limit: int = 6000, per_lang: int = 3,
                  snippet: int = 200):
@@ -77,6 +80,12 @@ class WikiTools:
     def call(self, name: str, argument: str) -> str:
         if len(self.calls) >= self.max_calls:
             return f"Лимит вызовов исчерпан ({self.max_calls}). Пишите презентацию по уже найденному."
+        if any(not c.get("error") and c["name"] == name and c["argument"].strip() == argument.strip()
+               for c in self.calls):
+            # повтор слово в слово не выполняется, но тратит вызов; штраф за повтор — в награде
+            result = REPEAT_MESSAGE
+            self.calls.append({"name": name, "argument": argument, "chars": len(result), "repeat": True})
+            return result
         handler = {"search": self.search, "open": self.open, "read": self.read}.get(name)
         result = handler(argument) if handler else f"Нет инструмента «{name}». Есть: search, open, read."
         self.calls.append({"name": name, "argument": argument, "chars": len(result)})

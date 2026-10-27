@@ -25,7 +25,7 @@ from pptx.util import Emu, Inches, Pt
 
 from ..dsl import LARGE_VISUALS, Deck, Element, ParseLimits, Slide, parse
 from .themes import Theme
-from .visuals import DPI, RenderError, render_formula, render_plot
+from .visuals import DPI, RenderError, plot_issue, plot_points, render_formula, render_plot
 
 SLIDE_W = 13.333
 SLIDE_H = 7.5
@@ -45,6 +45,13 @@ SMALL_SIZE = 10
 NODE_SIZES = (14, 13, 12, 11, 10)  # единственное исключение: подпись внутри узла схемы
 
 PROSE = ("BULLET", "TEXT")  # элементы текстового потока
+# Средняя ширина символа в долях размера шрифта — по замеру в PowerPoint (946 слайдов примеров SFT, 27.10.2026):
+# основной текст угадывается по числу строк в 92% абзацев, заголовки — в 96%; см. scripts/text_fit.
+BODY_CHAR = 0.49  # 0,48 угадывает точнее, но занижает 1% абзацев — текст наезжает на следующий элемент
+HEADING_CHAR = 0.58
+QUOTE_CHAR = 0.52  # курсив Cambria; цитат в замере мало (19), коэффициент взят с запасом
+TEXTBOX_MARGINS = 0.06  # верхнее и нижнее поле текстового блока
+BOTTOM_TOLERANCE = 0.3  # под колонкой только край слайда: тексту можно зайти в нижний запас примерно на строку
 
 
 # ------------------------------------------------------------------ оформление
@@ -61,7 +68,7 @@ def _rgb(hex_color: str) -> RGBColor:
 class ElementReport:
     slide: int  # номер слайда в презентации, с 1
     kind: str
-    status: str  # ok | render_error | overflow | placeholder | text_overflow | bad_source
+    status: str  # ok | render_error | overflow | placeholder | text_overflow | bad_source | flat_plot | undefined_plot
     line: int | None = None
     message: str = ""
 
@@ -235,6 +242,7 @@ class _SlideBuilder:
         self.total = total
         self.t = theme
         self.assets = assets
+        self._formula_px: dict[str, tuple[int, int] | None] = {}
         self.report = report
         self.is_title_slide = index == 1
         self.text_fill: float | None = None
@@ -311,7 +319,7 @@ class _SlideBuilder:
     def _layout(self, body: _Box, text_blocks, visuals, dark: bool) -> None:
         gap = 0.4
         if not visuals:
-            self._text_column(body, text_blocks, dark)
+            self._text_column(body, text_blocks, dark, bottom_free=True)
             return
         if not text_blocks:
             if len(visuals) == 1:
@@ -332,7 +340,7 @@ class _SlideBuilder:
             return
         share = 0.52 if len(visuals) == 1 else 0.46
         text_w = body.w * share
-        self._text_column(_Box(body.x, body.y, text_w, body.h), text_blocks, dark)
+        self._text_column(_Box(body.x, body.y, text_w, body.h), text_blocks, dark, bottom_free=True)
         vis = _Box(body.x + text_w + gap, body.y, body.w - text_w - gap, body.h)
         if len(visuals) == 1:
             self._visual(visuals[0], vis)
@@ -404,28 +412,44 @@ class _SlideBuilder:
     def _block_height(self, block: list[Element], width: float, size: int) -> float:
         kind = block[0].kind
         if kind in PROSE:
-            return sum(
-                _estimate_lines(e.data["text"], width - 0.1 - (0.32 if e.kind == "BULLET" else 0.0), size) * size * 1.2 / 72
-                + size * 0.5 / 72
+            lines = sum(
+                _estimate_lines(e.data["text"], width - 0.1 - (0.32 if e.kind == "BULLET" else 0.0), size, factor=BODY_CHAR)
                 for e in block
-            ) + 0.1
+            )
+            # строка — 1,2 размера шрифта; отступ 0,5 размера — только между абзацами, после последнего его нет
+            return lines * size * 1.2 / 72 + (len(block) - 1) * size * 0.5 / 72 + TEXTBOX_MARGINS
         if kind == "QUOTE":
             e = block[0]
             inner = width - 0.6
-            # Курсив Cambria шире Calibri: считаем как жирный.
-            height = _estimate_lines("«" + e.data["text"] + "»", inner, size, bold=True) * size * 1.25 / 72
+            height = _estimate_lines("«" + e.data["text"] + "»", inner, size, factor=QUOTE_CHAR) * size * 1.25 / 72
             if e.data.get("attribution"):
                 height += _estimate_lines(e.data["attribution"], inner, ATTRIBUTION_SIZE) * ATTRIBUTION_SIZE * 1.25 / 72 + 0.12
             return height + 0.45
         if kind == "FORMULA":
-            return 0.75
+            return self._formula_height(block[0], width)
         return 0.0
 
-    def _text_column(self, box: _Box, blocks, dark: bool) -> None:
+    def _formula_height(self, element: Element, width: float) -> float:
+        """Высота формулы на слайде — по её картинке (рисуется заранее, размер не зависит от цвета)."""
+        latex = element.data["latex"]
+        if latex not in self._formula_px:
+            try:
+                self._formula_px[latex] = render_formula(latex, self.assets / f"formula_size_{self.index}_{element.line}.png")
+            except RenderError:
+                self._formula_px[latex] = None
+        size = self._formula_px[latex]
+        if size is None:
+            return -0.2  # не рисуется и места не занимает, как в _formula
+        width_in, height_in = size[0] / DPI, size[1] / DPI
+        return height_in * min(1.0, (width - 0.3) / width_in, 0.9 / height_in)
+
+    def _text_column(self, box: _Box, blocks, dark: bool, bottom_free: bool = False) -> None:
+        """``bottom_free`` — под колонкой только край слайда (нет визуала и строки источников)."""
         size = BODY_SIZE
         needed = self._text_height(blocks, box.w, size) - 0.2
         self.text_fill = min(1.0, needed / box.h) if box.h > 0 else 1.0
-        if needed > box.h + 0.05:
+        tolerance = BOTTOM_TOLERANCE if bottom_free and not self.sources else 0.05
+        if needed > box.h + tolerance:
             # Шрифт не уменьшаем: переполнение видно на слайде и попадает в отчёт.
             self.report.items.append(
                 ElementReport(
@@ -599,7 +623,10 @@ class _SlideBuilder:
             category_axis = chart.category_axis
             category_axis.tick_labels.font.size = Pt(10)
             category_axis.format.line.color.rgb = _rgb(self.t.grid)
-        self._record(element, "ok")
+        if d["type"] == "line" and len(set(d["values"])) == 1:
+            self._record(element, "flat_plot", "все значения линейного графика одинаковы")
+        else:
+            self._record(element, "ok")
 
     def _plot(self, element: Element, box: _Box) -> None:
         d = element.data
@@ -613,7 +640,13 @@ class _SlideBuilder:
             self._record(element, "render_error", str(exc))
             return
         self.slide.shapes.add_picture(str(png), Inches(box.x), Inches(box.y), Inches(box.w), Inches(box.h))
-        self._record(element, "ok")
+        issue = plot_issue(*plot_points(d["expression"], d["x_min"], d["x_max"]))
+        if issue == "undefined":
+            self._record(element, "undefined_plot", "на большей части отрезка функция не определена")
+        elif issue == "flat":
+            self._record(element, "flat_plot", "график выглядит прямой линией: функция почти не меняется или сжата выбросом")
+        else:
+            self._record(element, "ok")
 
     def _image_placeholder(self, element: Element, box: _Box) -> None:
         """Поиск в Wikimedia Commons ещё не подключён: на месте картинки рисуется заглушка с описанием."""
@@ -1003,13 +1036,15 @@ class _TreeDrawer(_DiagramDrawer):
 # ------------------------------------------------------------- оценка текста
 
 
-def _estimate_lines(text: str, width_in: float, size_pt: float, bold: bool = False, heading: bool = False) -> int:
-    """Грубая оценка числа строк при переносе по словам (средняя ширина символа Calibri/Cambria).
+def _estimate_lines(text: str, width_in: float, size_pt: float, bold: bool = False, heading: bool = False,
+                    factor: float | None = None) -> int:
+    """Оценка числа строк при переносе по словам (средняя ширина символа Calibri/Cambria).
 
-    Для шрифта заголовков (жирный Cambria) берём запас: на кириллице средний символ около 0,57–0,59 em,
-    а LibreOffice переносит ещё раньше, чем дают метрики шрифта.
+    Основной текст, заголовки и цитаты — с коэффициентами по замеру в PowerPoint (``BODY_CHAR``, ``HEADING_CHAR``,
+    ``QUOTE_CHAR``); мелкие подписи схем, лент и источников — с прежним запасом (0,56; жирные — 0,6).
     """
-    factor = 0.68 if heading else 0.6 if bold else 0.56
+    if factor is None:
+        factor = HEADING_CHAR if heading else 0.6 if bold else 0.56
     per_line = max(1, int(width_in / (size_pt * factor / 72)))
     lines, current = 1, 0
     # После дефиса строка тоже может переноситься («Нормативно-» / «правовое»): считаем части отдельными словами.

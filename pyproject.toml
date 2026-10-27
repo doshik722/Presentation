@@ -15,6 +15,7 @@ dev = ["pytest>=8", "nbformat>=5", "jupyterlab>=4"]
 models = ["torch>=2.2", "transformers>=4.51", "accelerate>=1"]
 quantization = ["bitsandbytes>=0.45"]
 training = ["trl", "peft"]
+reward = ["pymorphy3>=2", "sentence-transformers>=3"]
 
 [project.scripts]
 presentation-rl = "presentation_rl.cli:main"

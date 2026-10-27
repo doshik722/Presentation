@@ -6,7 +6,7 @@ import pytest
 
 from presentation_rl.tools.cache import CacheMiss, WikiCache
 from presentation_rl.tools.wiki import WikiClient
-from presentation_rl.tools.wiki_tools import WikiTools, _fit_cap
+from presentation_rl.tools.wiki_tools import REPEAT_MESSAGE, WikiTools, _fit_cap
 
 LEAD = "Общая идея метода: двигаться против градиента. " * 10  # подводка раздела с подразделами, ~480 символов
 ARTICLE = f"""Градиентный спуск — метод нахождения локального минимума функции.
@@ -171,6 +171,17 @@ def test_call_limit_and_errors(setup):
     assert "Неверный id" in tools.call("read", "раздел 3")
     assert "Лимит вызовов исчерпан" in tools.call("search", "градиентный спуск")
     assert len(tools.calls) == 2
+
+
+def test_verbatim_repeat_is_not_executed_but_spends_a_call(setup):
+    tools, api, _ = setup
+    assert "d1 | ru | Градиентный спуск" in tools.call("search", "градиентный спуск")
+    requests = api.calls
+    assert tools.call("search", " градиентный спуск ") == REPEAT_MESSAGE
+    assert tools.calls[-1]["repeat"] and len(tools.calls) == 2
+    assert api.calls == requests  # повтор не обращается к API
+    assert tools.call("search", "градиентный спуск метод") != REPEAT_MESSAGE  # не слово в слово — выполняется
+    assert "repeat" not in tools.calls[-1] and len(tools.calls) == 3
 
 
 def test_fit_cap():

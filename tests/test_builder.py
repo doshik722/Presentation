@@ -136,6 +136,25 @@ def test_plot_render_error_is_reported(tmp_path):
     assert [(i.kind, i.status) for i in report.items] == [("PLOT", "render_error")]
 
 
+@pytest.mark.parametrize("plot, status", [
+    ("y = 3x + 1; x=0..10", "ok"),  # честная прямая — не ошибка
+    ("y = x^2; x=-2..2", "ok"),
+    ("y = sin(x); x=0..0.1", "flat_plot"),  # нелинейная, но на отрезке выглядит прямой
+    ("y = x^2; x=100..101", "flat_plot"),
+    ("y = exp(x); x=0..100", "flat_plot"),  # выброс сжал кривую в линию
+    ("y = log(x); x=-10..1", "undefined_plot"),  # почти везде не определена: рисуется, но это ошибка
+])
+def test_plot_quality_status(tmp_path, plot, status):
+    _, report = build_from_text(f"#SLIDE\n#TITLE: Т\n#PLOT: {plot}", tmp_path / "p.pptx")
+    assert [(i.kind, i.status) for i in report.items] == [("PLOT", status)]
+
+
+def test_constant_line_chart_is_flat(tmp_path):
+    text = "#SLIDE\n#TITLE: Т\n#CHART: type=line; title=Доли; x=2020,2021,2022; y=5,5,5"
+    _, report = build_from_text(text, tmp_path / "c.pptx")
+    assert [(i.kind, i.status) for i in report.items] == [("CHART", "flat_plot")]
+
+
 def test_formula_limit(tmp_path):
     text = "#SLIDE\n#TITLE: Т\n" + "\n".join(f"#FORMULA: x_{i}" for i in range(4))
     _, report = build_from_text(text, tmp_path / "f.pptx")
@@ -221,8 +240,8 @@ def test_long_title_does_not_cover_subtitle(tmp_path):
     subtitle = next(s for s in shapes if s.text_frame.text == "Подзаголовок")
     assert title.text_frame.vertical_anchor == MSO_ANCHOR.BOTTOM
     assert title.top + title.height <= subtitle.top
-    # Оценка с запасом: заголовок в колонке 7 дюймов при 40 pt — не меньше 4 строк.
-    assert title.height >= Pt(40 * 1.2 * 4)
+    # Заголовок в колонке 7 дюймов при 40 pt: в PowerPoint — 3 строки (замер 27.10.2026, sft_t018_gemini).
+    assert title.height >= Pt(40 * 1.2 * 3)
 
 
 SOURCES = {

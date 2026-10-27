@@ -1,7 +1,7 @@
 # Здесь проверяем эпизод с вызовами инструментов без модели: токенизатор посимвольный, ответы модели заданы заранее.
 import pytest
 
-from presentation_rl.environment import END, NEXT_TURN, parse_tool_calls, run_episode
+from presentation_rl.environment import END, NEXT_TURN, NO_SEARCH_MESSAGE, parse_tool_calls, run_episode
 from presentation_rl.tools.cache import WikiCache
 from presentation_rl.tools.wiki import WikiClient
 from presentation_rl.tools.wiki_tools import WikiTools
@@ -104,5 +104,16 @@ def test_length_limit_and_no_tools():
     tok = CharTokenizer()
     episode = run_episode(tok.encode("п"), tok, Script(tok, ["#SLIDE\n#TITLE: очень длинный" + END]), None, max_new_tokens=8)
     assert episode.finish == "length" and episode.answer == "#SLIDE\n#"
-    episode = run_episode(tok.encode("п"), tok, Script(tok, [CALL + END]), None)
-    assert episode.finish == "stop" and episode.answer.startswith("<tool_call>")  # без поиска вызов — просто текст
+
+
+def test_no_search_mode_refuses_calls_and_ends_after_two_refusals():
+    tok = CharTokenizer()
+    script = Script(tok, [CALL + END, "#SLIDE\n#TITLE: Спуск" + END])
+    episode = run_episode(tok.encode("п" + NEXT_TURN), tok, script, None)
+    assert episode.finish == "stop" and episode.answer == "#SLIDE\n#TITLE: Спуск"
+    assert NO_SEARCH_MESSAGE in tok.decode(script.inputs[1])
+    assert [c["disabled"] for c in episode.calls] == [True]
+    script = Script(tok, [CALL + END] * 3)
+    episode = run_episode(tok.encode("п" + NEXT_TURN), tok, script, None)
+    assert episode.finish == "max_turns" and len(episode.calls) == 3 and len(script.inputs) == 3
+    assert episode.calls[-1]["chars"] == 0  # третий вызов остался без ответа

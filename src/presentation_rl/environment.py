@@ -27,6 +27,8 @@ END = "<|im_end|>"
 TOOL_RESULTS_START = "\n<|im_start|>user"
 TOOL_RESULT = "\n<tool_response>\n{}\n</tool_response>"
 NEXT_TURN = END + "\n<|im_start|>assistant\n<think>\n\n</think>\n\n"  # как add_generation_prompt шаблона
+NO_SEARCH_MESSAGE = "Поиск в этом режиме недоступен. Пишите презентацию без него."
+NO_SEARCH_REPLIES = 2  # после двух отказов следующий вызов заканчивает эпизод
 
 _CALL_RE = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL)
 _ARGUMENTS = {"search": "query", "open": "id", "read": "id"}
@@ -129,7 +131,9 @@ def run_episode(
 ) -> Episode:
     """Генерация с вызовами инструментов до конца ответа, лимита токенов или лимита реплик.
 
-    ``tools=None`` — поиска нет: вызовы не выполняются, текст реплики целиком идёт парсеру (там он станет ошибкой).
+    ``tools=None`` — поиска нет: вызов не выполняется, среда отвечает ``NO_SEARCH_MESSAGE`` и модель продолжает;
+    после ``NO_SEARCH_REPLIES`` отказов следующий вызов заканчивает эпизод. Вызовы пишутся в ``episode.calls``
+    с пометкой ``disabled`` — за них штрафует награда. При использовании вызов запрещён на уровне генерации.
     """
     episode = Episode(list(prompt_ids))
     if tools is not None:
@@ -137,19 +141,15 @@ def run_episode(
     ids = list(prompt_ids)
     budget = max_new_tokens
     parts: list[str] = []
-    turns = tools.max_calls + 2 if tools is not None else 1
+    turns = tools.max_calls + 2 if tools is not None else NO_SEARCH_REPLIES + 1
     episode.finish = "max_turns"
-    for _ in range(turns):
+    for turn in range(turns):
         new, finished = generate(ids, budget)
         budget -= len(new)
         text = tokenizer.decode(new, skip_special_tokens=False)
         episode.segments.append(Segment(list(new), text, True))
         ids += new
         content = text[:-len(END)] if text.endswith(END) else text
-        if tools is None:
-            parts.append(content.strip())
-            episode.finish = "stop" if finished else "length"
-            break
         clean, calls = parse_tool_calls(content)
         parts.append(clean)
         if not finished:
@@ -158,7 +158,16 @@ def run_episode(
         if not calls:
             episode.finish = "stop"
             break
-        results = [_execute(tools, call, episode) for call in calls]
+        if tools is None:
+            last = turn == turns - 1
+            for call in calls:
+                episode.calls.append({"name": call.name, "argument": call.argument, "error": call.error,
+                                      "chars": 0 if last else len(NO_SEARCH_MESSAGE), "disabled": True})
+            if last:
+                break
+            results = [NO_SEARCH_MESSAGE] * len(calls)
+        else:
+            results = [_execute(tools, call, episode) for call in calls]
         block = TOOL_RESULTS_START + "".join(TOOL_RESULT.format(r) for r in results) + NEXT_TURN
         if not text.endswith(END):  # модель закончила реплику без <|im_end|> (например, по eos) — дописываем
             block = END + "\n" + block.lstrip("\n")
