@@ -214,6 +214,7 @@ class WikiClient:
         min_interval: float = 0.5,
         retries: int = 4,
         fetch: Callable[[str, dict], dict] | None = None,
+        busy_delays: tuple[float, ...] = (5, 15, 30),
     ):
         contact = contact or os.environ.get("WIKI_CONTACT", "")
         if not contact and fetch is None:
@@ -221,6 +222,7 @@ class WikiClient:
         self.headers = {"User-Agent": USER_AGENT.format(contact=contact)}
         self.min_interval = min_interval
         self.retries = retries
+        self.busy_delays = busy_delays  # паузы при «Search is currently too busy» — поиск перегружен дольше, чем на секунды
         self._fetch = fetch or self._http_get
         self._last = 0.0
         self.requests = 0  # попытки, включая повторы
@@ -237,7 +239,8 @@ class WikiClient:
         params = {"format": "json", "formatversion": "2", "maxlag": "5", **params}
         url = f"https://{lang}.wikipedia.org/w/api.php?" + urllib.parse.urlencode(params)
         delay = 2.0
-        for attempt in range(self.retries + 1):
+        busy = 0
+        for attempt in range(self.retries + len(self.busy_delays) + 1):
             wait = self.min_interval - (time.monotonic() - self._last)
             if wait > 0:
                 time.sleep(wait)
@@ -263,6 +266,11 @@ class WikiClient:
                 self.failures.append("maxlag: серверы Википедии перегружены")
                 time.sleep(delay)
                 delay *= 2
+                continue
+            if data.get("error", {}).get("code") == "cirrussearch-too-busy-error" and busy < len(self.busy_delays):
+                self.failures.append("поиск Википедии перегружен")
+                time.sleep(self.busy_delays[busy])
+                busy += 1
                 continue
             if "error" in data:
                 raise RuntimeError(f"API Википедии: {data['error']}")

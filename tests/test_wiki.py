@@ -121,3 +121,20 @@ def test_client_retries_and_records_failures():
     finally:
         wiki.time.sleep = sleep
     assert client.requests == 2 and client.failures == ["сеть: timed out"]
+
+
+def test_client_waits_when_search_is_too_busy():
+    busy = {"error": {"code": "cirrussearch-too-busy-error", "info": "Search is currently too busy."}}
+    answers = [busy, busy, {"query": {"search": []}}]
+    sleeps = []
+    client = WikiClient(fetch=lambda url, headers: answers.pop(0), min_interval=0)
+    import presentation_rl.tools.wiki as wiki
+    sleep, wiki.time.sleep = wiki.time.sleep, sleeps.append
+    try:
+        assert client.search("ru", "спуск") == []
+        answers[:] = [busy] * 4
+        with pytest.raises(RuntimeError, match="too-busy"):  # после трёх пауз — ошибка среды
+            client.search("ru", "спуск")
+    finally:
+        wiki.time.sleep = sleep
+    assert [s for s in sleeps if s >= 5] == [5, 15, 5, 15, 30]
