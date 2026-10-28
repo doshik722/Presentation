@@ -44,6 +44,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from dataclasses import asdict, dataclass, field, replace
@@ -75,6 +76,7 @@ _OUTPUT_HEADS = (
 _RESULT_RE = re.compile(r"^d(\d+) \| (ru|en) \| (.+?) \| (.*)$")
 _ARTICLE_RE = re.compile(r"^d(\d+)$")
 _SECTION_RE = re.compile(r"^d(\d+)(?:#(\d+))?$")
+DEFAULT_CONTACT = "https://github.com/doshik722"  # контакт для User-Agent Википедии, как в тетрадках
 
 
 @dataclass
@@ -655,8 +657,8 @@ def replay(example: Example, tokenizer, prompt_ids: list[int]) -> Episode:
 def main(argv: list[str] | None = None) -> int:
     """``python -m presentation_rl.sft_search [папка проекта] [--real]``.
 
-    Без ``--real`` — проверка ответов составителей: ``sft_search_report.txt``. С ``--real`` (нужен доступ к Википедии
-    и ``WIKI_CONTACT``, ответы сохраняются в ``data/sources/wiki_cache``) — ещё и подстановка настоящей выдачи:
+    Без ``--real`` — проверка ответов составителей: ``sft_search_report.txt``. С ``--real`` (нужен доступ к Википедии;
+    контакт для User-Agent — ``WIKI_CONTACT`` или адрес репозитория, как в тетрадках; ответы сохраняются в ``data/sources/wiki_cache``) — ещё и подстановка настоящей выдачи:
     набор для SFT ``sft_search_dataset.jsonl`` и ``sft_search_real_report.txt``.
     """
     args = argv if argv is not None else sys.argv[1:]
@@ -675,7 +677,8 @@ def main(argv: list[str] | None = None) -> int:
     from .tools.wiki_tools import WikiTools
 
     tasks = {t.id: t for t in load_tasks(tasks_path, split="sft")}
-    tools = WikiTools(WikiCache(root / "data" / "sources" / "wiki_cache", WikiClient()))
+    contact = os.environ.get("WIKI_CONTACT") or DEFAULT_CONTACT
+    tools = WikiTools(WikiCache(root / "data" / "sources" / "wiki_cache", WikiClient(contact=contact)))
     final = Report()
     for example in report.examples:
         result, problems, notes = substitute(example, tools, tasks[example.id])
