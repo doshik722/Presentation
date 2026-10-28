@@ -1,0 +1,457 @@
+### t084
+```
+[модель]
+#PLAN: место MAS в модели Хофстеде → происхождение исследования → маскулинные и феминные ценности → сравнение стран → применение в управлении → ограничения → выводы
+#PLAN: ищу описание модели и её автора, чтобы проверить терминологию и выбрать статьи для чтения
+<tool_call>
+{"name": "search", "arguments": {"query": "Хофстеде"}}
+</tool_call>
+[программа]
+Результаты поиска «Хофстеде»:
+d1 | ru | Типология культурных измерений Хофстеде | Типология культурных измерений, разработанная Гертом Хофстеде, является основой для кросс-культурной коммуникации…
+d2 | ru | Хофстеде, Герт | Герт (Герард Хендрик) Хофстеде (нид. Geert (Gerard Hendrik) Hofstede; 3 октября 1928, Харлем, Нидерланды — 12 февраля 2020) — нидерландский социолог…
+d3 | en | Hofstede's cultural dimensions theory | Hofstede's cultural dimensions theory is a framework for cross-cultural psychology, developed by Geert Hofstede…
+d4 | en | Geert Hofstede | Gerard Hendrik (Geert) Hofstede (2 October 1928 – 12 February 2020) was a Dutch social psychologist, IBM employee, and Professor Emeritus of Organizational Anthropology…
+[модель]
+#PLAN: открываю русскую статью для определения MAS и английскую для истории исследования, числовых сравнений и ограничений модели
+<tool_call>
+{"name": "open", "arguments": {"id": "d1"}}
+</tool_call>
+<tool_call>
+{"name": "open", "arguments": {"id": "d3"}}
+</tool_call>
+[программа]
+d1 | ru | Типология культурных измерений Хофстеде
+d1#0 Введение
+Типология культурных измерений, разработанная Гертом Хофстеде, является основой для кросс-культурной коммуникации. Используя информацию, полученную из факторного анализа, он описывает влияние культуры общества на индивидуальные ценности своих членов, и как эти ценности влияют на их поведение. Типология основана на идее о том, что ценность может быть распределена по шести измерениям культуры.
+К этим измерениям относятся: дистанцированность от власти, обособленность, мужественность, избегание неопределенности, стратегическое мышление и допущение (или индульгенция). [дальше: read d1#0]
+d1#1 Параметры культурных измерений
+d1#2   Индекс дистанции власти (PDI)
+d1#3   Индивидуализм (IDV)
+d1#4   Маскулинность (MAS)
+d1#5   Избегание неопределённости (UAI)
+d1#6   Долгосрочная ориентация (LTO)
+d1#7   Потворство желаниям против сдержанности (IVR)
+d1#8 История
+d1#9 Сопоставление показателей
+d1#10 Корреляции ценностных измерений с другими различиями стран
+d1#11 Практическое применение теории
+d1#12 Критика модели Хофстеде
+[программа]
+d3 | en | Hofstede's cultural dimensions theory
+d3#0 Introduction
+Hofstede's cultural dimensions theory is a framework for cross-cultural psychology, developed by Geert Hofstede. [дальше: read d3#0]
+d3#1 History
+d3#2 Dimensions of national cultures
+Power distance index (PDI): The power distance index is defined as [дальше: read d3#2]
+d3#3   Differences between cultures on the values dimensions
+d3#4   Correlations of values with other country differences
+d3#5 Applications of the model
+d3#6   Practical applications of theory
+Geert Hofstede is perhaps the best known sociologist of culture and anthropologist in the context of applications for understanding international business. [дальше: read d3#6]
+d3#7     International communication
+d3#8     International negotiation
+d3#9     International management
+d3#10     International marketing
+d3#11     International transportation
+d3#12 Limitations of Hofstede's model
+Even though Hofstede's model is generally accepted as the most comprehensive framework of national cultures' values by those studying business culture, its validity and its limitations have been extensively criticized. [дальше: read d3#12]
+d3#13   Questionable choice of national level
+Aside from Hofstede's six cultural dimensions, there are other factors on which culture can be analyzed. [дальше: read d3#13]
+d3#14     Individual level: cultural dimensions versus individual personalities
+d3#15     Organizational level
+d3#16     Gender level
+[модель]
+#PLAN: читаю подраздел о MAS, историю опросов IBM и сравнение стран, чтобы опереться на определения, даты и опубликованные значения индекса
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#4"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#1"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#3"}}
+</tool_call>
+[программа]
+d1#4 | ru | Типология культурных измерений Хофстеде — Маскулинность (MAS)
+Маскулинность означает нацеленность на достижение результата любой ценой. Страны с большим значением этого показателя относят к «мужскому типу» (США, Япония, Испания, Италия, Австрия, Мексика, Филиппины), для них характерны такие качества как соперничество, уверенность в себе, целеустремлённость, приверженность материальным ценностям. Страны с низким значением (Дания, Норвегия, Швеция) относят к «женскому типу».
+Для них характерны почитание взаимоотношений, культурных ценностей, забота о качестве жизни.
+[программа]
+d3#1 | en | Hofstede's cultural dimensions theory — History
+In 1965 Hofstede founded the personnel research department of IBM Europe (which he managed until 1971). Between 1967 and 1973, he executed a large survey study regarding national values differences across the worldwide subsidiaries of this multinational corporation: he compared the answers of 117,000 IBM matched employees samples on the same attitude survey in different countries.
+He first focused his research on the 40 largest countries, and then extended it to 50 countries and 3 regions, "at that time probably the largest matched-sample cross-national database available anywhere." The theory was one of the first quantifiable theories that could be used to explain observed differences between cultures.
+This initial analysis identified systematic differences in national cultures on four primary dimensions: power distance (PDI), individualism (IDV), uncertainty avoidance (UAI) and masculinity (MAS), which are described below. [обрезано: ещё 2400 символов]
+[программа]
+d3#3 | en | Hofstede's cultural dimensions theory — Differences between cultures on the values dimensions
+Putting together national scores (from 1 for the lowest to 100 for the highest), Hofstede's six-dimensions model allows international comparison between cultures, also called comparative research:
+Power distance index shows very high scores for Latin American and Asian countries, African areas and the Arab world. On the other hand, Germanic countries, including Anglophone countries, have a lower power distance (only 11 for Austria and 18 for Denmark).
+For example, the United States has a 40 on the cultural scale of Hofstede's analysis. Compared to Guatemala where the power distance is very high (95) and Austria where it is very low (11), the United States is in the middle.
+Germany scores a high UAI (65) and Belgium even more (94) compared to Sweden (29) or Denmark (23) despite their geographic proximity. However, few countries have very low UAI.
+Motivation towards Achievement & Success is extremely low in Nordic countries: Norway scores 8 and Sweden only 5. In contrast, MAS is very high in Japan (95), and in European countries like Hungary, Austria and Switzerland influenced by German culture. In the Anglo world, MAS scores are relatively high with 66 for the United Kingdom for example. Latin American countries present contrasting scores: for example Venezuela has a 73-point score whereas Chile's is only 28. [обрезано: ещё 800 символов]
+[модель]
+#PLAN: проверяю различие между национальными средними, личностью и культурой организации, а также историческую связь названия MAS с гендерными ролями
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#14"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#15"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#16"}}
+</tool_call>
+[программа]
+d3#14 | en | Hofstede's cultural dimensions theory — Individual level: cultural dimensions versus individual personalities
+Hofstede acknowledges that the cultural dimensions he identified, as culture and values, are social constructions, which are the ideas in the world developed by people, and can differ between the different groups and change as time goes by(Burr & Dick, 2017). They are tools meant to be used in practical applications. Generalizations about one country’s culture are helpful, but they have to be regarded just as guidelines, and they do not necessarily apply to everyone.
+They are group-level dimensions which describe national averages which apply to the population in its entirety. For example, a Japanese person can be very comfortable in changing situations whereas on average, Japanese people have high uncertainty avoidance. There are still exceptions to the rule. Hofstede's theory can be contrasted with its equivalence at individual level: the trait theory about human personality.
+Variations on the typologies of collectivism and individualism have been proposed (Triandis, 1995; Gouveia and Ros, 2000). Self-expression and individualism usually increase with economic growth (Inglehart, 1997) independent of any culture, and can help small populations faced with outside competition for resources. [обрезано: ещё 1700 символов]
+[программа]
+d3#15 | en | Hofstede's cultural dimensions theory — Organizational level
+Within and across countries, individuals are also parts of organizations such as companies. Hofstede acknowledges that "the […] dimensions of national cultures are not relevant for comparing organizations within the same country". In contrast with national cultures embedded in values, organizational cultures are embedded in practices.
+From 1985 to 1987, Hofstede's institute IRIC (Institute for Research on Intercultural Cooperation) has conducted a separate research project in order to study organizational culture. Including 20 organizational units in two countries (Denmark and the Netherlands), six different dimensions of practices, or communities of practice have been identified:
+Process-Oriented vs. Results-Oriented
+Employee-Oriented vs. Job-Oriented
+Parochial vs. Professional
+Open System vs. Closed System
+Loose Control vs. Tight Control
+Pragmatic vs. Normative
+Managing international organizations involves understanding both national and organizational cultures. Communities of practice across borders are significant for multinationals in order to hold the company together.
+[программа]
+d3#16 | en | Hofstede's cultural dimensions theory — Gender level
+When describing culture, gender differences are largely not taken into consideration. However, there are certain factors that are useful to analyze in the discussion of cross-cultural communication. According to Hofstede's model, men's culture differs greatly from women's culture within each society. Although men and women can often perform the same duties from a technical standpoint, there are often situations to which each gender has a different response.
+In situations where one gender responds in an alternative manner to their prescribed roles, the other sex may not even accept their deviant gender role. The level of reactions experienced by people exposed to foreign cultures can be compared similarly to the reactions of gender behaviors of the opposite sex. The degree of gender differentiation in a country depends primarily on the culture within that nation and its history.
+Hofstede's masculine-feminine dichotomy divides organizations into those exhibiting either compassion, solidarity, collectivism and universalism, or competition, autonomy, merit, results and responsibility. [обрезано: ещё 700 символов]
+[модель]
+#SLIDE
+#TITLE: Параметрическая модель Г. Хофстеде: маскулинность и феминность
+#TEXT: Параметр MAS помогает сравнивать культурные представления об успехе, соперничестве, отношениях и качестве жизни. Рассмотрим происхождение модели, различия между её полюсами, примеры стран и границы применения в управлении.
+
+#SLIDE
+#TITLE: MAS в системе культурных измерений
+#TEXT: Маскулинность и феминность описывают один аспект культурных предпочтений. Для анализа общества его рассматривают вместе с отношением к власти, группе, неопределённости, времени и удовлетворению желаний. Отдельный индекс не заменяет целостного культурного профиля.
+#DIAGRAM: type=tree; Модель Хофстеде > Дистанция власти PDI, Индивидуализм IDV, Маскулинность MAS, Избегание неопределённости UAI, Долгосрочная ориентация LTO, Потворство желаниям IVR
+#NOTES: Предложить аудитории различить вопросы о распределении власти и о критериях успеха. Они относятся к разным измерениям, хотя в реальной организации могут проявляться одновременно.
+#SOURCE: d1#0
+
+#SLIDE
+#TITLE: Эмпирическая основа модели
+#TEXT: Хофстеде сопоставлял ответы сотрудников международных подразделений IBM на одинаковые вопросы. Такой подход позволял искать устойчивые различия между национальными выборками при сходном корпоративном контексте. Маскулинность вошла в первоначальный набор измерений вместе с дистанцией власти, индивидуализмом и избеганием неопределённости.
+#TIMELINE: 1965 — создание исследовательского подразделения IBM Europe; 1967 — начало международного опроса; 1971 — завершение руководства подразделением; 1973 — окончание периода сбора данных
+#NOTES: Работа в одной корпорации частично ограничивала различия профессиональной среды. Одновременно она сужала представительство населения, поэтому результаты требуют осторожного переноса за пределы исследованной среды.
+#SOURCE: d3#1
+
+#SLIDE
+#TITLE: Маскулинный полюс: достижения и признание
+#TEXT: На маскулинном полюсе особенно значимы соперничество, уверенность в себе и материальные признаки успеха. Достижение становится основанием для признания и продвижения. В анализе организации это помогает обсуждать, какие результаты получают одобрение и какие способы вознаграждения считаются убедительными.
+#DIAGRAM: type=tree; Признание достижений > Сравнение результатов, Вознаграждение; Сравнение результатов > Рейтинг; Вознаграждение > Деньги, Статус
+#NOTES: Схема показывает возможную управленческую интерпретацию ценностей. Она не означает, что каждый сотрудник в стране с высоким MAS предпочитает соревнование или денежную премию.
+#SOURCE: d1#4
+
+#SLIDE
+#TITLE: Феминный полюс: отношения и качество жизни
+#TEXT: На феминном полюсе большее значение получают взаимоотношения и качество жизни. При оценке успеха учитываются условия совместной работы и благополучие людей. Такая ориентация позволяет рассматривать сотрудничество и заботу о рабочей среде как самостоятельные ценности.
+#DIAGRAM: type=tree; Качество жизни > Рабочая среда, Отношения; Рабочая среда > Удобный режим; Отношения > Взаимопомощь, Уважение
+#NOTES: Низкий MAS не означает отсутствия целей или требований к результату. Обсуждение касается относительного веса ценностей, а не деления обществ на эффективные и неэффективные.
+#SOURCE: d1#4
+
+#SLIDE
+#TITLE: Название параметра и гендерные роли
+#TEXT: Историческое название связывает культурные предпочтения с общественными ожиданиями от мужских и женских ролей. При этом страновой показатель не определяет личность человека по его полу. Сравнение значений MAS относится к культурному уровню и требует проверки конкретного контекста.
+#CHART: type=bar; title=Опубликованные значения MAS; x=Япония,Великобритания; y=95,66
+#NOTES: Индекс не показывает долю мужчин и не измеряет биологические особенности. Различие между странами нельзя превращать в характеристику отдельного японца или британца.
+#SOURCE: d3#3, d3#14, d3#16
+
+#SLIDE
+#TITLE: Географическая близость не задаёт значение MAS
+#TEXT: Принадлежность к одному региону не гарантирует сходства культурных предпочтений. В приведённых данных Венесуэла и Чили заметно различаются по MAS. Поэтому региональные обобщения полезно проверять по конкретным странам, а затем уточнять на уровне организации и участников взаимодействия.
+#CHART: type=bar; title=MAS в двух странах Латинской Америки; x=Венесуэла,Чили; y=73,28
+#NOTES: Эти значения представляют опубликованное сравнение в модели, а не описание каждого современного жителя. По диаграмме также нельзя установить причины различий между странами.
+#SOURCE: d3#3, d3#14
+
+#SLIDE
+#TITLE: Низкие значения MAS: Норвегия и Швеция
+#TEXT: Норвегия и Швеция относятся к примерам низкого MAS. В терминах модели это соответствует большему вниманию к отношениям и качеству жизни. Показатели помогают сформулировать вопросы о мотивации и рабочих ожиданиях, но не дают готового портрета любого сотрудника.
+#CHART: type=bar; title=Опубликованные значения MAS; x=Норвегия,Швеция; y=8,5
+#NOTES: Небольшое различие между индексами не следует превращать в точный прогноз поведения. В прикладной работе важнее выяснить предпочтения участников, чем спорить о близких страновых значениях.
+#SOURCE: d1#4, d3#3, d3#14
+
+#SLIDE
+#TITLE: Применение: выбор системы признания
+#TEXT: Учебная ситуация: руководитель выбирает способ отметить вклад команды. Модель подсказывает обсудить индивидуальную награду и общие условия работы. Затем решение проверяют через разговор с сотрудниками, поскольку культурная гипотеза сама по себе не раскрывает их личных предпочтений.
+#DIAGRAM: type=flow; Выбор признания -->|индивидуальный вклад| Персональная награда; Выбор признания -->|совместный результат| Командное поощрение; Персональная награда -->|проверка предпочтений| Обсуждение с сотрудниками; Командное поощрение -->|проверка предпочтений| Обсуждение с сотрудниками
+#NOTES: Это условный пример применения, а не рекомендация для конкретной страны. Можно предложить участникам объяснить, когда публичная награда поддерживает мотивацию, а когда вызывает неловкость.
+#SOURCE: d1#4, d3#14
+
+#SLIDE
+#TITLE: Национальная и организационная культура
+#TEXT: Национальные культурные измерения описывают ценностные различия между обществами. Культура организации связана с повседневными практиками и требует отдельного анализа. Для её изучения институт IRIC исследовал 20 организационных подразделений в Дании и Нидерландах.
+#TIMELINE: 1985 — начало отдельного исследования организационной культуры IRIC; 1987 — завершение исследовательского проекта
+#NOTES: Страновой индекс нельзя автоматически присвоить каждой компании внутри страны. Полезно отдельно изучать реальные правила принятия решений, оценки сотрудников и взаимодействия подразделений.
+#SOURCE: d3#15
+
+#SLIDE
+#TITLE: Ограничения: выборка и национальные средние
+#TEXT: Расширение числа стран увеличивало охват исследования, но не устраняло вопрос о представительности сотрудников одной корпорации. Национальное среднее также скрывает различия внутри общества. Модель следует использовать как ориентир для постановки вопросов и проверять наблюдениями в конкретной ситуации.
+#CHART: type=bar; title=Число стран на этапах исходного исследования; x=Первоначальный охват,Расширенный охват; y=40,50
+#NOTES: В расширении исследования отдельно учитывались и регионы, которые эта диаграмма не показывает. Рост географического охвата сам по себе не превращает корпоративную выборку в случайную выборку населения.
+#SOURCE: d3#1, d3#14
+
+#SLIDE
+#TITLE: Выводы: MAS как инструмент культурного анализа
+#TEXT: Параметр MAS помогает сопоставлять относительную значимость достижений, соперничества, отношений и качества жизни. Он полезен для подготовки вопросов о мотивации и взаимодействии. Применение становится убедительнее, когда страновые ориентиры сопоставляют с практиками организации и предпочтениями конкретных людей.
+#DIAGRAM: type=flow; Культурный профиль -->|формулирует гипотезу| Вопросы о приоритетах; Вопросы о приоритетах -->|проверка| Наблюдение и разговор; Наблюдение и разговор -->|уточнение| Решение для ситуации; Решение для ситуации -->|обратная связь| Вопросы о приоритетах
+#NOTES: Завершить примером вопроса сотруднику о предпочтительном способе признания его вклада. Такой вопрос превращает культурную модель в начало содержательного разговора и помогает избежать стереотипных решений.
+```
+
+### t087
+```
+[модель]
+#PLAN: общие проявления инфекций → признаки респираторных вирусных заболеваний → возможные бактериальные очаги → течение болезни и ошибочные ориентиры → обследование → лечение → тревожные признаки → выводы
+#PLAN: готовлю 12 слайдов для широкой аудитории и начинаю с простуды как распространённого примера вирусной инфекции
+<tool_call>
+{"name": "search", "arguments": {"query": "Common cold"}}
+</tool_call>
+[программа]
+Результаты поиска «Common cold»:
+d1 | en | Common cold | The common cold, or simply a cold, is a viral infectious disease of the upper respiratory tract that primarily affects the respiratory mucosa of the nose, throat, sinuses, and larynx…
+d2 | ru | Простуда | Просту́да (англ. common cold) — клинический синдром острого воспаления верхних дыхательных путей, затрагивающего преимущественно нос и возникающего из-за неспецифической острой респираторной инфекции…
+[модель]
+#PLAN: открываю статью, чтобы найти описание симптомов, их развития и ограничений диагностики по внешним признакам
+<tool_call>
+{"name": "open", "arguments": {"id": "d1"}}
+</tool_call>
+[программа]
+d1 | en | Common cold
+d1#0 Introduction
+The common cold, or simply a cold, is a viral infectious disease of the upper respiratory tract that primarily affects the respiratory mucosa of the nose, throat, sinuses, and larynx. [дальше: read d1#0]
+Карточка статьи:
+Symptoms: Cough, sore throat, runny nose, fever, muscle aches, fatigue, headache, anorexia
+Causes: Viral (usually rhinovirus)
+Duration: 1–3 weeks
+Frequency: 2–3 per year (adults); 6–8 per year (children)
+d1#1 Signs and symptoms
+The typical symptoms of a cold include cough, runny nose, sneezing, nasal congestion, and a sore throat, [дальше: read d1#1]
+d1#2   Progression
+d1#3 Causes
+d1#4   Viruses
+d1#5   Transmission
+d1#6   Other
+d1#7 Pathophysiology
+d1#8 Diagnosis
+d1#9 Prevention
+d1#10 Management
+There is no cure for the common cold. [дальше: read d1#10]
+d1#11   Symptomatic
+d1#12   Antibiotics and antivirals
+d1#13   Zinc
+d1#14   Alternative medicine
+d1#15   Vitamins C and D
+d1#16 Prognosis
+d1#17 Epidemiology
+The common cold is the most common human disease and affects people all over the globe. [дальше: read d1#17]
+d1#18   Weather
+d1#19 History
+d1#20 Research directions
+d1#21 Societal impact
+[модель]
+#PLAN: читаю вводный текст о симптомах и отдельно подраздел о течении болезни, чтобы проверить частоты проявлений, длительность кашля и значение цвета выделений
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#1"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#2"}}
+</tool_call>
+[программа]
+d1#1 | en | Common cold — Signs and symptoms
+The typical symptoms of a cold include cough, runny nose, sneezing, nasal congestion, and a sore throat, sometimes accompanied by muscle ache, fatigue, headache, and loss of appetite. A sore throat is present in about 40% of cases, a cough in about 50%, and muscle aches in about 50%. In adults, a fever is generally not present but it is common in infants and young children. The cough is usually mild compared to that accompanying influenza. While a cough and a fever indicate a higher likelihood of influenza in adults, a great deal of similarity exists between these two conditions. A number of the viruses that cause the common cold may also result in asymptomatic infections.
+The color of the mucus or nasal secretion may vary from clear to yellow to green and does not show whether the infection is viral or bacterial.
+[программа]
+d1#2 | en | Common cold — Progression
+Cold symptoms over time
+A cold usually begins with fatigue, a feeling of being chilled, sneezing, and a headache, followed in a couple of days by a runny nose and cough. Symptoms may begin within sixteen hours of exposure and typically peak two to four days after onset. They usually resolve in seven to ten days, but some can last for up to three weeks. The average duration of cough is eighteen days and in some cases people develop a post-viral cough which can linger after the infection is gone. In children, the cough lasts for more than ten days in 35–40% of cases and continues for more than 25 days in 10%.
+[модель]
+#PLAN: ищу стрептококковый фарингит как пример бактериальной инфекции с симптомами, которые пересекаются с вирусными заболеваниями
+<tool_call>
+{"name": "search", "arguments": {"query": "Streptococcal pharyngitis"}}
+</tool_call>
+[программа]
+Результаты поиска «Streptococcal pharyngitis»:
+d3 | en | Streptococcal pharyngitis | Streptococcal pharyngitis, also known as streptococcal sore throat (strep throat), is pharyngitis (an infection of the pharynx, the back of the throat) caused by Streptococcus pyogenes…
+d4 | ru | Стрептококковый фарингит | Стрептококковый фарингит или стрептококковая ангина — инфекция задней стенки глотки, включая миндалины, вызванная стрептококком группы А…
+[модель]
+#PLAN: открываю статью, чтобы проверить характерные проявления и выбрать подраздел о подтверждении диагноза
+<tool_call>
+{"name": "open", "arguments": {"id": "d3"}}
+</tool_call>
+[программа]
+d3 | en | Streptococcal pharyngitis
+d3#0 Introduction
+Streptococcal pharyngitis, also known as streptococcal sore throat (strep throat), is pharyngitis (an infection of the pharynx, the back of the throat) caused by Streptococcus pyogenes, a gram-positive, group A streptococcus. Common symptoms include fever, sore throat, red tonsils, and enlarged lymph nodes in the front of the neck. [дальше: read d3#0]
+Карточка статьи:
+Symptoms: Fever, sore throat, enlarged lymph nodes
+Duration: 7–10 days
+Causes: Group A streptococcus
+Diagnostic method: Throat culture, strep test
+d3#1 Signs and symptoms
+d3#2 Cause
+d3#3 Diagnosis
+A number of scoring systems exist to help with diagnosis; however, their use is controversial due to insufficient accuracy. [дальше: read d3#3]
+d3#4   Laboratory testing
+d3#5   Differential diagnosis
+d3#6 Prevention
+d3#7 Treatment
+Untreated streptococcal pharyngitis usually resolves within a few days. [дальше: read d3#7]
+d3#8   Pain medication
+d3#9   Antibiotics
+d3#10 Prognosis
+d3#11 Complications
+d3#12 Epidemiology
+[модель]
+#PLAN: читаю подраздел о лабораторной диагностике и ищу сепсис, чтобы включить признаки опасного ухудшения без попытки определить возбудителя самостоятельно
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#4"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "Sepsis"}}
+</tool_call>
+[программа]
+d3#4 | en | Streptococcal pharyngitis — Laboratory testing
+A throat culture is the gold standard for the diagnosis of streptococcal pharyngitis, with a sensitivity of 90–95%. A rapid strep test (also called rapid antigen detection testing or RADT) may also be used. While the rapid strep test is quicker, it has a lower sensitivity (70%) and statistically equal specificity (98%) as a throat culture. In areas of the world where rheumatic fever is uncommon, a negative rapid strep test is sufficient to rule out the disease.
+A positive throat culture or RADT in association with symptoms establishes a positive diagnosis in those in which the diagnosis is in doubt. In adults, a negative RADT is sufficient to rule out the diagnosis. However, in children a throat culture is recommended to confirm the result. Asymptomatic individuals should not be routinely tested with a throat culture or RADT because a certain percentage of the population persistently "carries" the streptococcal bacteria in their throat without any harmful results.
+[программа]
+Результаты поиска «Sepsis»:
+d5 | en | Sepsis | Sepsis, also known as septicemia (or septicaemia in British English) is a potentially life-threatening condition that arises when the body's dysregulated response to infection causes injury…
+d6 | ru | Сепсис | Се́псис (др.-греч. σῆψις — гниение) — системная воспалительная реакция в ответ на генерализацию местного инфекционного процесса с развитием токсемии и бактериемии…
+[модель]
+#PLAN: открываю английскую статью о сепсисе и выбираю раздел о симптомах, чтобы проверить тревожные признаки
+<tool_call>
+{"name": "open", "arguments": {"id": "d5"}}
+</tool_call>
+[программа]
+d5 | en | Sepsis
+d5#0 Introduction
+Sepsis, also known as septicemia (or septicaemia in British English) is a potentially life-threatening condition that arises when the body's dysregulated response to infection causes injury to its own tissues and organs. [дальше: read d5#0]
+d5#1 Signs and symptoms
+d5#2 Cause
+d5#3 Pathophysiology
+Sepsis is caused by a combination of factors related to the particular invading pathogen(s) and the status of the immune system of the host. [дальше: read d5#3]
+d5#4   Microbial factors
+d5#5   Host factors
+d5#6 Diagnosis
+Early diagnosis is necessary to properly manage sepsis, as the initiation of rapid therapy is key to reducing deaths from severe sepsis. [дальше: read d5#6]
+d5#7   Definitions
+d5#8   End-organ dysfunction
+d5#9   Biomarkers
+d5#10   Differential diagnosis
+d5#11   Neonatal sepsis
+d5#12 Treatment
+Sepsis requires immediate treatment in a hospital as it can quickly worsen. [дальше: read d5#12]
+d5#13   Antibiotics
+d5#14   Intravenous fluids
+d5#15   Blood products
+d5#16   Vasopressors
+d5#17   Steroids
+d5#18   Anesthesia
+d5#19   Source control
+d5#20   Early goal-directed therapy
+d5#21   Newborns
+d5#22   Other
+d5#23 Prognosis
+d5#24 Epidemiology
+d5#25 History
+d5#26 Society and culture
+d5#27   Economics
+d5#28   Education
+d5#29   Awareness
+d5#30 Research
+[модель]
+#PLAN: читаю симптомы сепсиса для слайда о срочном обращении за медицинской помощью
+<tool_call>
+{"name": "read", "arguments": {"id": "d5#1"}}
+</tool_call>
+[программа]
+d5#1 | en | Sepsis — Signs and symptoms
+In addition to symptoms related to the actual cause, people with sepsis may have a fever, low body temperature, rapid breathing, a fast heart rate, confusion, and edema. Early signs include a rapid heart rate, decreased urination, and high blood sugar.
+Signs of established sepsis include confusion, metabolic acidosis (which may be accompanied by a faster breathing rate that leads to respiratory alkalosis), low blood pressure due to decreased systemic vascular resistance, higher cardiac output, and disorders in blood-clotting that may lead to organ failure. Fever is the most common presenting symptom in sepsis, but fever may be absent in some people, such as the elderly or those who are immunocompromised.
+The drop in blood pressure seen in sepsis can cause lightheadedness and is part of the criteria for septic shock.
+Oxidative stress is observed in septic shock, with circulating levels of copper and vitamin C being decreased. [обрезано: ещё 600 символов]
+[модель]
+#SLIDE
+#TITLE: Признаки вирусных и бактериальных инфекций
+#TEXT: Симптомы помогают оценить состояние и выбрать обследование, однако часто не позволяют самостоятельно определить возбудителя. На примерах простуды и стрептококкового фарингита рассмотрим общие проявления, диагностические ограничения и признаки опасного ухудшения.
+#CHART: type=bar; title=Простуды в год по оценкам статьи; x=Взрослые нижняя оценка,Взрослые верхняя оценка,Дети нижняя оценка,Дети верхняя оценка; y=2,3,6,8
+
+#SLIDE
+#TITLE: Многие симптомы встречаются при обеих инфекциях
+#TEXT: Лихорадка, слабость и боль могут сопровождать как вирусную, так и бактериальную инфекцию. Даже боль в горле встречается при разных возбудителях. Врач оценивает сочетание проявлений, поражённый орган, развитие болезни и общее состояние человека.
+#DIAGRAM: type=tree; Проявления инфекции > Местные, Общие; Местные > Боль в горле, Кашель; Общие > Лихорадка, Слабость
+#NOTES: Объяснить, что симптомы частично отражают реакцию организма на инфекцию. Один и тот же симптом поэтому может появляться при разных заболеваниях и не служит самостоятельным доказательством причины.
+#SOURCE: d1#1, d3#0
+
+#SLIDE
+#TITLE: Простуда как пример вирусной инфекции
+#TEXT: Для простуды характерны насморк, чихание, заложенность носа, кашель и боль в горле. У взрослых лихорадка часто отсутствует, хотя другие вирусные заболевания могут протекать с высокой температурой. Набор симптомов у разных людей различается.
+#CHART: type=bar; title=Примерная частота симптомов простуды в процентах; x=Боль в горле,Кашель,Мышечные боли; y=40,50,50
+#NOTES: Диаграмма показывает отдельные частоты, поэтому её значения не нужно складывать. Отсутствие любого из перечисленных проявлений само по себе не исключает простуду.
+#SOURCE: d1#1
+
+#SLIDE
+#TITLE: Бактериальная инфекция: значение очага
+#TEXT: При бактериальной инфекции возможны локальная боль, покраснение, припухлость или болезненность определённого органа. Такие проявления помогают искать очаг, но встречаются и при других состояниях. Бактериальные инфекции также могут сопровождаться выраженными общими симптомами и тяжёлым ухудшением.
+#DIAGRAM: type=tree; Возможный очаг > Кожа, Горло, Мочевые пути; Кожа > Покраснение и припухлость; Горло > Боль при глотании; Мочевые пути > Боль при мочеиспускании
+#NOTES: Эта схема помогает описать жалобы врачу, а не поставить диагноз. Например, боль при мочеиспускании требует оценки причин, а покраснение кожи может иметь и неинфекционное происхождение.
+
+#SLIDE
+#TITLE: Течение простуды важнее одного измерения
+#TEXT: При неосложнённой простуде симптомы обычно достигают пика, а затем постепенно ослабевают. Отдельные проявления могут сохраняться дольше основной болезни. Поэтому оценивают направление изменений и общее самочувствие, а не только продолжительность насморка или кашля.
+#TIMELINE: Вторые–четвёртые сутки болезни — обычный пик симптомов; Седьмые–десятые сутки — обычное разрешение основных проявлений; Третья неделя — отдельные симптомы ещё могут сохраняться
+#NOTES: Лента описывает типичный пример и не устанавливает срок, до которого нужно откладывать обращение. Новая одышка, выраженное ухудшение или повторное усиление симптомов требуют медицинской оценки независимо от дня болезни.
+#SOURCE: d1#2
+
+#SLIDE
+#TITLE: Цвет выделений и долгий кашель не устанавливают причину
+#TEXT: Жёлтые или зелёные выделения из носа сами по себе не отличают бактериальную инфекцию от вирусной. Кашель также может сохраняться после вирусного заболевания. Эти признаки оценивают вместе с динамикой, тяжестью состояния и результатами осмотра.
+#CHART: type=bar; title=Длительный кашель у детей после простуды в процентах; x=Дольше десяти дней нижняя оценка,Дольше десяти дней верхняя оценка,Дольше 25 дней; y=35,40,10
+#NOTES: Первые два столбца показывают границы одного диапазона, а не разные группы детей. Сохранение кашля не доказывает бактериальную причину, но его выраженность и сопутствующие симптомы могут стать поводом для обследования.
+#SOURCE: d1#1, d1#2
+
+#SLIDE
+#TITLE: Боль в горле: когда нужны исследования
+#TEXT: Стрептококковый фарингит может проявляться лихорадкой, болью в горле, покраснением миндалин и увеличением шейных лимфоузлов. Часть этих признаков встречается при вирусных заболеваниях. При подозрении на стрептококк врач может назначить исследование мазка из горла.
+#DIAGRAM: type=flow; Боль в горле -->|осмотр| Клиническая оценка; Клиническая оценка -->|подозрение на стрептококк| Мазок из горла; Мазок из горла -->|выявление антигена| Экспресс-тест; Мазок из горла -->|выращивание бактерий| Посев
+#NOTES: Не каждому человеку с болью в горле нужны оба исследования. Выбор зависит от клинической картины, возраста и того, как результат повлияет на лечение.
+#SOURCE: d3#0, d3#4
+
+#SLIDE
+#TITLE: Экспресс-тест: две характеристики точности
+#TEXT: Чувствительность отражает способность теста находить инфекцию у заболевших, а специфичность — давать отрицательный результат при её отсутствии. Приведённые в статье показатели характеризуют обзорные данные. Точность конкретного теста зависит от методики и качества взятия материала.
+#CHART: type=bar; title=Показатели RADT в приведённом обзоре в процентах; x=Чувствительность,Специфичность; y=70,98
+#NOTES: Эти показатели нельзя понимать как вероятность правильного диагноза у любого отдельного пациента. В частности, отрицательный экспресс-тест у ребёнка иногда требует подтверждения посевом по решению врача.
+#SOURCE: d3#4
+
+#SLIDE
+#TITLE: Почему результат теста оценивают вместе с симптомами
+#TEXT: Чувствительность и специфичность рассчитываются для разных групп: людей с инфекцией и без неё. Результат обследования также зависит от вероятности заболевания до теста. Кроме того, обнаружение бактерии у бессимптомного носителя не всегда объясняет текущие жалобы.
+#FORMULA: Se = \frac{TP}{TP + FN}
+#FORMULA: Sp = \frac{TN}{TN + FP}
+#NOTES: TP и TN обозначают верные положительные и отрицательные результаты, FN и FP — ошибочные. Достаточно пояснить смысл дробей без расчётов: даже хороший тест не заменяет оценку клинической ситуации.
+#SOURCE: d3#4
+
+#SLIDE
+#TITLE: Лечение выбирают по причине и показаниям
+#TEXT: Антибиотики действуют на бактерии и не лечат вирусную инфекцию. При подтверждённой бактериальной причине необходимость препарата и схему определяет врач. Для некоторых вирусных заболеваний существуют специальные противовирусные средства, но их применяют по конкретным показаниям.
+#DIAGRAM: type=flow; Клиническая оценка -->|вирусная причина| Симптоматическая помощь; Клиническая оценка -->|бактериальная причина| Решение об антибиотике; Симптоматическая помощь -->|при специальных показаниях| Противовирусное лечение; Решение об антибиотике -->|подбор врачом| Препарат и схема
+#NOTES: Не каждая бактериальная инфекция требует одинакового лечения или немедленного антибиотика. Самостоятельная проба препарата не является способом отличить вирус от бактерии и может затруднить дальнейшую оценку.
+
+#SLIDE
+#TITLE: Тревожные признаки требуют срочной помощи
+#TEXT: Затруднённое или резко учащённое дыхание, спутанность сознания, резкое уменьшение мочеиспускания и выраженное ухудшение требуют срочной медицинской оценки. Нормальная температура не исключает тяжёлую инфекцию. При таких признаках не следует ждать самостоятельного определения возбудителя.
+#DIAGRAM: type=flow; Нарушение дыхания -->|срочная оценка| Неотложная медицинская помощь; Спутанность сознания -->|срочная оценка| Неотложная медицинская помощь; Резкое уменьшение мочи -->|срочная оценка| Неотложная медицинская помощь
+#NOTES: Перечисленные симптомы могут сопровождать сепсис, но встречаются и при других опасных состояниях. Особенно важно быстро реагировать на ухудшение у пожилых людей и людей с ослабленным иммунитетом, у которых лихорадка может отсутствовать.
+#SOURCE: d5#1
+
+#SLIDE
+#TITLE: Выводы: симптомы задают направление обследования
+#TEXT: Вирусные и бактериальные инфекции имеют много общих признаков. Локализация жалоб и развитие болезни помогают выбрать обследование, а цвет выделений не устанавливает причину. Решение о лечении опирается на клиническую оценку, при тревожных признаках нужна срочная помощь.
+#NOTES: Вернуться к различию между обычной динамикой и опасным ухудшением: ориентировочные сроки не являются разрешением ждать при тяжёлых симптомах. Главный практический навык слушателя — точно описать жалобы, их изменения и вовремя обратиться за помощью.
+```
+

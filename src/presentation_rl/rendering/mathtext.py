@@ -10,7 +10,9 @@
 - команды оформления без смысла для слайда: ``\\displaystyle``, ``\\big``, ``\\tag{1}`` …;
 - ``\\xrightarrow{a}`` → ``\\overset{a}{\\longrightarrow}``;
 - остаток от деления: ``\\pmod{N}`` → ``\\;(\\mathrm{mod}\\;N)``, ``\\bmod`` и ``\\mod`` → ``\\mathrm{mod}``;
-- окружения ``cases`` и ``aligned``: строки ставим друг под другом через ``\\genfrac``.
+- окружения ``cases`` и ``aligned``: строки ставим друг под другом через ``\\genfrac``;
+- сокращённая дробь без скобок: ``\\frac12`` → ``\\frac{1}{2}``, ``\\frac1a`` → ``\\frac{1}{a}`` (в LaTeX так можно,
+  mathtext требует скобки); так же шрифт и акцент над одной буквой: ``\\mathbf w`` → ``\\mathbf{w}``, ``\\hat x`` → ``\\hat{x}``.
 
 Что не умеем переписать (матрицы, ``\\ce``, ``\\underbrace`` …), оставляем как есть:
 сборщик отметит такую формулу как ``render_error``.
@@ -61,12 +63,21 @@ _STACK_ENVS = ("aligned", "align", "gathered", "gather", "split")
 _COMMAND = re.compile(r"\\\\|\\([A-Za-z]+)(\*?)")
 _ENV = re.compile(r"\\begin\{(\w+)\*?\}(.*?)\\end\{\1\*?\}", re.DOTALL)
 _NESTED_TEXT = re.compile(r"\\text\{\s*\\text\{([^{}]*)\}\s*\}")
+_SHORT_ARG = re.compile(r"\\(mathbf|mathrm|mathit|mathcal|mathbb|mathsf|mathtt|boldsymbol|vec|hat|bar|tilde|dot|ddot)"
+                        r"(?:\s+|(?=[0-9]))([0-9A-Za-z])")
+_SHORT_FRAC = re.compile(r"\\([dt]?frac|binom)\s*([0-9A-Za-z]|\{[^{}]*\})\s*([0-9A-Za-z]|\{[^{}]*\})")
+
+
+def _braced(token: str) -> str:
+    return token if token.startswith("{") else "{" + token + "}"
 
 
 def to_mathtext(latex: str) -> str:
     """Переписывает формулу LaTeX в вид, который понимает mathtext."""
     text = _ENV.sub(_convert_env, latex)
     text = _convert_commands(text)
+    text = _SHORT_ARG.sub(lambda m: "\\" + m.group(1) + "{" + m.group(2) + "}", text)
+    text = _SHORT_FRAC.sub(lambda m: "\\" + m.group(1) + _braced(m.group(2)) + _braced(m.group(3)), text)
     while True:  # \textbf внутри \text превратился в \text{\text{…}}
         collapsed = _NESTED_TEXT.sub(r"\\text{\1}", text)
         if collapsed == text:

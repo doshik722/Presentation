@@ -1,0 +1,435 @@
+### t030
+```
+[модель]
+#PLAN: language and thought → linguistic influence → colour categories → inner speech → development → non-verbal thinking → grammar and logic → practical conclusions
+#PLAN: ищу определения языка и мышления; дословные выдержки сохраняю в пределах 25 слов из каждой статьи с учётом повторов
+<tool_call>
+{"name": "search", "arguments": {"query": "language thought"}}
+</tool_call>
+[программа]
+Результаты поиска «language thought»:
+d1 | en | Language and thought | The…
+d2 | en | Language | Language is a structured system of communication that consists of grammar and vocabulary.
+d3 | ru | Язык | Язы́к — сложная знаковая система, естественно или искусственно созданная и соотносящая понятийное содержание и типовое звучание (написание).
+d4 | en | Thought | Thought, or thinking, is a cognitive process in which the mind considers, creates, or manipulates ideas, representations, or information.
+d5 | ru | Мышление | Мышле́ние — познавательная деятельность человека.
+[модель]
+#PLAN: открываю обзорную статью, чтобы выбрать раздел с конкретным примером влияния языка
+<tool_call>
+{"name": "open", "arguments": {"id": "d1"}}
+</tool_call>
+[программа]
+d1 | en | Language and thought
+d1#0 Введение
+The study of how language influences thought and vice versa has a long history in a variety of fields. [дальше: read d1#0]
+d1#1 Language of thought
+d1#2 Scientific hypotheses
+d1#3 Studies concerning the Sapir–Whorf hypothesis
+d1#4   Counting
+d1#5   Orientation
+d1#6   Color
+d1#7 Other schools of thought
+d1#8 Popular culture
+[модель]
+#PLAN: читаю подраздел о цвете и отдельно ищу формулировку лингвистической относительности
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#6"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "linguistic relativity"}}
+</tool_call>
+[программа]
+d1#6 | en | Language and thought — Color
+Language may influence color processing.
+[обрезано: ещё 500 символов]
+[программа]
+Результаты поиска «linguistic relativity»:
+d6 | en | Linguistic relativity | Linguistic relativity asserts that language influences ones worldview and cognition.
+d7 | ru | Гипотеза лингвистической относительности | Гипотеза лингвистической относительности…
+[модель]
+#PLAN: ищу речь, обращённую к себе, чтобы объяснить связь языка с планированием и развитием мышления
+<tool_call>
+{"name": "search", "arguments": {"query": "private speech"}}
+</tool_call>
+[программа]
+Результаты поиска «private speech»:
+d8 | en | Private speech | Private…
+d9 | ru | Разговор вслух с самим собой | Разговор вслух с самим собой — психологическое состояние, при котором человек разговаривает с самим собой вслух, в том числе в присутствии других людей.
+d10 | en | Intrapersonal communication | Intrapersonal communication (also known as autocommunication or inner speech) is communication with oneself or self-to-self communication.
+[модель]
+#PLAN: открываю статью о детской речи для себя и выбираю раздел об её развитии
+<tool_call>
+{"name": "open", "arguments": {"id": "d8"}}
+</tool_call>
+[программа]
+d8 | en | Private speech
+d8#0 Введение
+Private speech… [дальше: read d8#0]
+d8#1 History and theory
+d8#2 Benefits and uses for children
+Evidence… [дальше: read d8#2]
+d8#3   Behavioral self-regulation and emotion regulation
+d8#4   Memory, motivation, communication, and creativity
+d8#5 Research
+d8#6 In adults
+[модель]
+#PLAN: беру короткие дословные фрагменты о дошкольной речи и переходе к внутренней речи
+<tool_call>
+{"name": "read", "arguments": {"id": "d8#1"}}
+</tool_call>
+[программа]
+d8#1 | en | Private speech — History and theory
+…reaches a peak during preschool or kindergarten when children talk aloud to themselves.
+…children transition to using inner speech.
+…Private speech serves as "the social/cultural tool or symbol system of language, first used for interpersonal communication but later employed by the child overtly for intrapersonal communication and self-guidance."
+[обрезано: ещё 2400 символов]
+[модель]
+#PLAN: для слайда о влиянии и предопределении открываю статью о лингвистической относительности: нужна позиция Сепира
+<tool_call>
+{"name": "open", "arguments": {"id": "d6"}}
+</tool_call>
+[программа]
+d6 | en | Linguistic relativity
+d6#0 Введение
+Linguistic relativity asserts that language influences ones worldview and cognition. [дальше: read d6#0]
+d6#1 History
+d6#2   Ancient philosophy to the Enlightenment
+d6#3   German Romantic philosophers
+d6#4     Johann Georg Hamann
+d6#5     Wilhelm von Humboldt
+d6#6   Boas and Sapir
+[модель]
+<tool_call>
+{"name": "read", "arguments": {"id": "d6#6"}}
+</tool_call>
+[программа]
+d6#6 | en | Linguistic relativity — Boas and Sapir
+The idea that some languages are superior to others and that lesser languages maintained their speakers in intellectual poverty was widespread during the early 20th century.
+…However, Sapir explicitly rejected strong linguistic determinism by stating, "It would be naïve to imagine that any analysis of experience is dependent on pattern expressed in language."
+[обрезано: ещё 2000 символов]
+[модель]
+#SLIDE
+#TITLE: Language and thinking / Язык и мышление
+#TEXT: How words help us organise experience, develop ideas and communicate meaning.
+#TEXT: Как слова помогают упорядочивать опыт, развивать идеи и передавать смысл.
+#DIAGRAM: type=flow; Experience / Опыт -->|interpretation / осмысление| Concepts / Понятия; Concepts / Понятия -->|expression / выражение| Words / Слова; Words / Слова -->|clarification / уточнение| Concepts / Понятия
+#SLIDE
+#TITLE: Related processes, different roles / Связанные процессы, разные роли
+#TEXT: Language provides shared signs and rules. Thinking involves working with ideas and information. We use language to express thoughts, but producing a sentence and understanding an idea are different tasks.
+#TEXT: Язык предоставляет общие знаки и правила. Мышление позволяет работать с идеями и информацией. Мы выражаем мысли словами, однако построение предложения и понимание идеи — разные задачи.
+#NOTES: Consider a familiar word that you can pronounce without understanding its meaning. This shows why fluent speech alone does not guarantee understanding. Перевод: вспомните знакомое слово, которое вы можете произнести, не понимая его значения. Этот пример показывает, почему свободная речь сама по себе не гарантирует понимания.
+#SOURCE: d2, d4
+#SLIDE
+#TITLE: Influence and determination / Влияние и предопределение
+#TEXT: Linguistic relativity asks how language influences cognition. A much stronger claim says that language determines the limits of thought. Evidence of influence should not automatically be treated as evidence of complete determination.
+#TEXT: Лингвистическая относительность рассматривает влияние языка на познание. Более сильное утверждение связывает с языком сами границы мышления. Наличие влияния ещё не доказывает полного предопределения.
+#QUOTE: It would be naïve to imagine that any analysis of experience is dependent on pattern expressed in language — Edward Sapir
+#NOTES: A useful distinction is between making something easier to notice and making alternatives impossible to understand. Keep this distinction in mind when discussing examples. Перевод: полезно различать облегчение внимания к признаку и невозможность понять альтернативу. Это различие необходимо сохранять при обсуждении примеров.
+#SOURCE: d6#6
+#SLIDE
+#TITLE: Colour categories / Категории цвета
+#TEXT: Language may influence colour processing. Colour words divide a continuous range of shades into familiar categories. Comparing vocabularies suggests research questions, while experiments test what speakers actually notice or remember.
+#TEXT: Язык может влиять на обработку цвета. Названия разделяют непрерывный ряд оттенков на привычные категории. Сравнение словарей помогает поставить вопрос, а эксперимент проверяет особенности внимания и памяти.
+#DIAGRAM: type=tree; Colour vocabulary / Цветовая лексика > English / Английский, Russian / Русский; English / Английский > blue; Russian / Русский > синий, голубой
+#NOTES: The diagram compares naming conventions rather than the physical ability to see colours. Different labels alone cannot establish a difference in perception. Перевод: схема сравнивает способы называния, а не физическую способность видеть цвета. Одних различий в названиях недостаточно для вывода о различиях восприятия.
+#SOURCE: d1#6
+#SLIDE
+#TITLE: Inner speech / Внутренняя речь
+#TEXT: Language can address the speaker as well as other people. Silently rehearsing an explanation or reminding ourselves of a goal gives thought a verbal form that we can inspect and revise.
+#TEXT: Язык может быть обращён к самому говорящему. Мысленное повторение объяснения или напоминание о цели придаёт мысли словесную форму, которую можно рассмотреть и уточнить.
+#QUOTE: the social/cultural tool or symbol system of language, first used for interpersonal communication but later employed by the child overtly for intrapersonal communication and self-guidance — M. Gholami et al., «Private speech and cognitive development: A review of the two theories»
+#NOTES: Before an important conversation, people often imagine what they will say. Use this familiar example to connect communication with planning. Перевод: перед важным разговором люди нередко представляют свои будущие реплики. Этот знакомый пример связывает общение с планированием.
+#SOURCE: d10, d8#1
+#SLIDE
+#TITLE: From speaking aloud to speaking internally / От внешней речи к внутренней
+#TEXT: Children may talk aloud while guiding their own actions. In Vygotsky’s account, this speech becomes increasingly internal as development continues. The transition describes a developmental tendency rather than a fixed timetable for every child.
+#TEXT: Дети могут вслух направлять собственные действия. В объяснении Выготского такая речь постепенно становится внутренней. Этот переход описывает тенденцию развития, а не одинаковое расписание для каждого ребёнка.
+#TIMELINE: Preschool / Дошкольный возраст — speaking aloud to oneself / речь вслух для себя; Later elementary years / Старшие годы начальной школы — transition towards inner speech / переход к внутренней речи
+#NOTES: Imagine a child assembling a puzzle and naming the next action aloud. The important point is the changing function of speech, rather than silence as a goal. Перевод: представьте ребёнка, который собирает головоломку и вслух называет следующее действие. Главное здесь — изменение функции речи, а не молчание как цель.
+#SOURCE: d8#1
+#SLIDE
+#TITLE: Thinking beyond words / Мышление за пределами слов
+#TEXT: Thinking includes more than composing sentences. We can imagine a route, recognise a melody or mentally rotate an object. Verbal descriptions can support these activities without fully replacing their visual or auditory content.
+#TEXT: Мышление шире составления предложений. Мы можем представить маршрут, узнать мелодию или мысленно повернуть предмет. Словесное описание помогает, но не полностью заменяет зрительное или слуховое содержание.
+#NOTES: Ask listeners to imagine their route home before describing it. The experience helps distinguish an image from the words later used to explain it. Перевод: предложите слушателям представить дорогу домой до её описания. Этот опыт помогает различить образ и слова, которыми его затем объясняют.
+#SOURCE: d4
+#SLIDE
+#TITLE: Grammar changes logical scope / Грамматика меняет логический смысл
+#TEXT: “Not both answers are correct” allows one correct answer. It differs from “Neither answer is correct”. Let A and B mean that each answer is correct: the formula makes the scope of negation explicit.
+#TEXT: «Не оба ответа верны» допускает один верный ответ. Это отличается от «Ни один ответ не верен». Обозначения A и B относятся к верности каждого ответа: формула уточняет область отрицания.
+#FORMULA: \neg(A \land B) \equiv (\neg A) \lor (\neg B)
+#NOTES: Explain that the left side denies the joint truth of both statements. It does not require both statements to be false. Перевод: объясните, что левая часть отрицает одновременную истинность утверждений. Она не требует, чтобы оба утверждения были ложными.
+#SLIDE
+#TITLE: Explaining helps us examine ideas / Объяснение помогает проверять идеи
+#TEXT: Turning an idea into an explanation can reveal missing steps. A useful practice is to state a claim, give an example and revise unclear wording. This is a learning strategy rather than a guarantee of correctness.
+#TEXT: Превращение идеи в объяснение помогает заметить пропущенные шаги. Полезно сформулировать утверждение, привести пример и уточнить неясные слова. Это учебный приём, а не гарантия правильности.
+#DIAGRAM: type=flow; Claim / Утверждение -->|illustration / иллюстрация| Example / Пример; Example / Пример -->|checking / проверка| Gap / Пробел; Gap / Пробел -->|revision / уточнение| Claim / Утверждение
+#NOTES: Demonstrate the strategy with an everyday claim such as “This route is faster”. Asking under what conditions it is faster exposes information the original sentence left unstated. Перевод: покажите приём на утверждении «Этот маршрут быстрее». Вопрос об условиях обнаруживает информацию, которую исходная фраза не выражала.
+#SLIDE
+#TITLE: Conclusions / Выводы
+#TEXT: Language helps organise and communicate thought. Its influence varies with the task and should be tested carefully. Thinking also uses images and other representations, so a balanced account recognises both the power and the limits of words.
+#TEXT: Язык помогает организовывать и передавать мысли. Его влияние зависит от задачи и требует проверки. Мышление также использует образы и другие представления, поэтому необходимо учитывать возможности и ограничения слов.
+#DIAGRAM: type=flow; Thought / Мысль -->|expression / выражение| Language / Язык; Language / Язык -->|clarification / уточнение| Thought / Мысль; Evidence / Данные -->|testing / проверка| Explanation / Объяснение; Explanation / Объяснение -->|revision / пересмотр| Thought / Мысль
+#NOTES: Return to the question of whether words merely express ideas or also help shape them. The examples support examining particular mechanisms instead of giving one universal answer. Перевод: вернитесь к вопросу о том, только ли слова выражают идеи или также помогают их формировать. Примеры показывают пользу изучения конкретных механизмов вместо единственного универсального ответа.
+```
+
+### t032
+```
+[модель]
+#PLAN: тезис → забота в действиях → совместная ответственность → близость → границы аргумента → вывод
+#PLAN: ищу трёхкомпонентную теорию любви, чтобы отделить позицию докладчика от психологической модели
+<tool_call>
+{"name": "search", "arguments": {"query": "Трёхкомпонентная теория любви"}}
+</tool_call>
+[программа]
+Результаты поиска «Трёхкомпонентная теория любви»:
+d1 | ru | Трёхкомпонентная теория любви | Трёхкомпоне́нтная…
+d2 | en | Triangular theory of love | The…
+[модель]
+#PLAN: открываю английскую статью и выбираю подраздел о близости
+<tool_call>
+{"name": "open", "arguments": {"id": "d2"}}
+</tool_call>
+[программа]
+d2 | en | Triangular theory of love
+d2#0 Введение
+The… [дальше: read d2#0]
+d2#1 Components
+Different stages and types of love… [дальше: read d2#1]
+d2#2   Intimacy
+d2#3   Passion
+d2#4   Commitment
+d2#5 Influences
+d2#6 Elaboration
+d2#7 Forms of love
+d2#8 Measuring tools
+d2#9 Support and criticism
+[модель]
+#PLAN: читаю определение близости и открываю русскую статью для примера отношений, построенных только на обязательствах
+<tool_call>
+{"name": "read", "arguments": {"id": "d2#2"}}
+</tool_call>
+<tool_call>
+{"name": "open", "arguments": {"id": "d1"}}
+</tool_call>
+[программа]
+d2#2 | en | Triangular theory of love — Intimacy
+Intimacy is the attachment and bonding component in the model.
+[обрезано: ещё 160 символов]
+[программа]
+d1 | ru | Трёхкомпонентная теория любви
+d1#0 Введение
+Трёхкомпоне́нтная тео́рия любви́ (англ. triangular theory of love) — теория любви, разработанная психологом Робертом Стернбергом. В контексте личных взаимоотношений, «тремя составляющими любви, согласно трёхкомпонентной теории, являются близость, страсть и обязательства». [дальше: read d1#0]
+d1#1 Теория
+В трёхкомпонентной теории… [дальше: read d1#1]
+d1#2   Формы любви
+d1#3   «Роковая» любовь
+d1#4 Значение в науке
+d1#5 Критика
+[модель]
+#PLAN: беру короткое описание пустой любви, чтобы не приравнивать совместный быт к счастливым отношениям
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#2"}}
+</tool_call>
+[программа]
+d1#2 | ru | Трёхкомпонентная теория любви — Формы любви
+…Пустая любовь характеризуется обязательствами без близости или страсти.
+…Он подчёркивает важность переноса компонентов любви. «Без выражения», — предупреждает он, — «даже величайшая любовь может умереть».
+[обрезано: ещё 4000 символов]
+[модель]
+#SLIDE
+#TITLE: Почему бытовуха в отношениях лучше, чем романтика
+#TEXT: Позиция для короткого выступления: ценность отношений особенно заметна в обычный день, когда нужно заботиться друг о друге и вместе решать дела.
+#IMAGE: пара готовит ужин на домашней кухне после рабочего дня
+#SLIDE
+#TITLE: Аргумент первый: заботу можно почувствовать
+#TEXT: Романтический жест радует в особенный момент. Повседневная забота отвечает на конкретную потребность: поесть, отдохнуть, получить помощь. Для меня приготовленный ужин после тяжёлого дня убедительнее красивого обещания, потому что за ним стоят внимание и потраченное время.
+#IMAGE: человек приносит партнёру чай и еду, пока тот отдыхает дома
+#NOTES: Букет приятно получить, но особенно трогает помощь, о которой не пришлось просить несколько раз. Именно поэтому обычные действия я считаю сильным аргументом в пользу совместной жизни.
+#SLIDE
+#TITLE: Аргумент второй: быт учит быть командой
+#TEXT: Покупки, уборка и общий бюджет требуют договорённостей. Здесь видно, умеем ли мы учитывать чужую усталость и выполнять обещанное. В хорошем быту партнёры обсуждают нагрузку и делят ответственность так, чтобы совместная жизнь была посильной для обоих.
+#DIAGRAM: type=flow; Общие дела -->|обсуждение нагрузки| Договорённость; Договорённость -->|выполнение| Взаимная помощь; Взаимная помощь -->|обратная связь| Договорённость; Взаимная помощь -->|результат| Время на отдых
+#NOTES: Представим, что один человек задерживается на работе, а другой берёт на себя ужин. Такой обмен поддержкой показывает командную работу гораздо яснее, чем соревнование в эффектных сюрпризах.
+#SLIDE
+#TITLE: За привычными делами может стоять близость
+#TEXT: В модели Стернберга близость связана с привязанностью и эмоциональной связью. Совместные дела могут стать способом выразить это отношение: заметить состояние партнёра, проявить участие, поддержать разговор. Так повседневность приобретает личный смысл, который невозможно заменить одним списком выполненных обязанностей.
+#QUOTE: тремя составляющими любви, согласно трёхкомпонентной теории, являются близость, страсть и обязательства — Роберт Стернберг
+#NOTES: Английский фрагмент описывает близость как компонент привязанности и связи. Теория помогает назвать важную сторону отношений, а мои бытовые примеры иллюстрируют собственный аргумент.
+#SOURCE: d2#2, d1
+#SLIDE
+#TITLE: Одних обязанностей недостаточно
+#TEXT: Совместный адрес и оплаченные счета ещё не означают счастливые отношения. Мой аргумент относится к быту, в котором сохраняются внимание и добровольное участие. Если один человек обслуживает другого и чувствует себя одиноким, такую повседневность трудно назвать преимуществом.
+#QUOTE: Без выражения… даже величайшая любовь может умереть — Роберт Стернберг
+#NOTES: Поэтому я защищаю заботливую повседневность, а не привычку терпеть неудобные отношения. Романтические впечатления тоже могут быть ценными, когда они дополняют взаимное участие.
+#SOURCE: d1#2
+#SLIDE
+#TITLE: Вывод: любовь заметна в обычный день
+#TEXT: Для меня бытовуха лучше романтики тогда, когда означает надёжность и общую ответственность. Красивый вечер запоминается, а ежедневная поддержка делает совместную жизнь удобнее и теплее. Поэтому лучший комплимент отношениям — возможность спокойно рассчитывать друг на друга.
+#DIAGRAM: type=flow; Замеченная потребность -->|внимание| Конкретная помощь; Конкретная помощь -->|взаимность| Доверие; Доверие -->|основа| Совместные планы
+#NOTES: Я бы закончил так: любовь проверяется и тогда, когда никто не готовит праздничный сценарий. Если рядом человек, с которым можно разделить обычный вторник, у отношений уже есть большая ценность.
+```
+
+### t037
+```
+[модель]
+#PLAN: отрасль и наука → историческое становление → предмет и методы регулирования → нормы и институты → субъекты → источники → научные методы → выводы
+#PLAN: ищу определение конституционного права и раздел о нём как о науке
+<tool_call>
+{"name": "search", "arguments": {"query": "Конституционное право"}}
+</tool_call>
+[программа]
+Результаты поиска «Конституционное право»:
+d1 | ru | Конституционное право | Конституцио́нное…
+d2 | en | Constitutional law | Constitutional law is a body of law which defines the role, powers, and structure…
+[модель]
+#PLAN: открываю статью и нахожу раздел, позволяющий разграничить правовое регулирование и научное знание
+<tool_call>
+{"name": "open", "arguments": {"id": "d1"}}
+</tool_call>
+[программа]
+d1 | ru | Конституционное право
+d1#0 Введение
+Конституцио́нное пра́во… [дальше: read d1#0]
+d1#1 Конституция
+d1#2 Регулируемые общественные отношения
+d1#3 Методы регулирования
+d1#4 Субъекты регулируемых отношений
+d1#5 Структура
+d1#6 История развития
+d1#7 Источники права
+d1#8 Конституционное право как наука
+[модель]
+#PLAN: читаю определение науки и ищу статью о конституции как центральном источнике отрасли
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#8"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "Конституция"}}
+</tool_call>
+[программа]
+d1#8 | ru | Конституционное право — Конституционное право как наука
+Конституционное право как наука представляет собой совокупность знаний об истории государственного строительства, конституционно-правовых теориях (доктрин).
+[обрезано: ещё 900 символов]
+[программа]
+Результаты поиска «Конституция»:
+d3 | ru | Конституция | Конститу́ция (от лат. constitutio — «устройство, установление, сложение») — основной закон государства, особый нормативный правовой акт…
+d4 | en | Constitution | A constitution is an aggregate of fundamental principles or established precedents that constitute the legal basis of a polity…
+[модель]
+#PLAN: ищу ранние писаные конституции для исторических примеров; проверяю даты по отдельным статьям
+<tool_call>
+{"name": "search", "arguments": {"query": "Конституция США"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "Конституция 1791"}}
+</tool_call>
+[программа]
+Результаты поиска «Конституция США»:
+d5 | ru | Конституция США | Конститу́ция США…
+d6 | en | Constitution of the United States | The Constitution…
+[программа]
+Результаты поиска «Конституция 1791»:
+d7 | ru | Конституция Франции 1791 года | Конституция Франции 1791 года (фр. Constitution de 1791) — французская конституция, принятая Национальным собранием 3 сентября 1791 года.
+d8 | en | French Constitution of 1791 | The French Constitution of 1791 (French: Constitution française du 3 septembre 1791) was the first written constitution in France…
+d9 | ru | Конституция 3 мая 1791 года | Конституция 3 мая 1791 года (пол. Konstytucja 3 maja) была принята Четырёхлетним сеймом, сословно-представительным органом Речи Посполитой…
+d10 | en | Constitution of 3 May 1791 | The Constitution of 3 May 1791, titled the Government Act, was a written constitution for the Polish–Lithuanian Commonwealth…
+[модель]
+#PLAN: читаю карточку Конституции США, проверяю даты российской конституции и уточняю значение юридической науки
+<tool_call>
+{"name": "read", "arguments": {"id": "d5#0"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "Конституция Российской Федерации"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "Юриспруденция"}}
+</tool_call>
+[программа]
+d5#0 | ru | Конституция США — Введение
+Конститу́ция США…
+[обрезано: ещё 1100 символов]
+Карточка статьи:
+Принятие: Филадельфийским конвентом 17 сентября 1787 года
+Вступление в силу: 4 марта 1789 года
+[программа]
+Результаты поиска «Конституция Российской Федерации»:
+d11 | ru | Конституция Российской Федерации | Конститу́ция Росси́йской Федера́ции — высший нормативный правовой акт Российской Федерации. Принята на Всенародном голосовании 12 декабря 1993 года, вступила в силу 25 декабря 1993 года.
+d12 | en | Constitution of Russia | The Constitution of the Russian Federation (Russian: Конституция Российской Федерации, romanized: Konstitutsiya Rossiyskoy Federatsii) was adopted by national referendum…
+[программа]
+Результаты поиска «Юриспруденция»:
+d13 | ru | Юриспруденция | Юриспруде́нция (лат. jūris prūdentia «правове́дение» ← jūs род. п. jūris «право» + prūdentia «предвидение; знание») — наука…
+d14 | en | Jurisprudence | Jurisprudence, also known as legal theory or legal science, is the philosophy of law.
+[модель]
+#SLIDE
+#TITLE: Конституционное право как отрасль права и наука
+#TEXT: Как нормы определяют основы публичной власти и положение личности, а наука исследует их содержание, развитие и действие.
+#DIAGRAM: type=tree; Конституционное право > Отрасль права, Наука; Отрасль права > Регулирование отношений; Наука > Объяснение закономерностей
+#SLIDE
+#TITLE: Отрасль регулирует, наука исследует
+#TEXT: Отрасль конституционного права объединяет юридические нормы. Наука формирует понятия, объясняет развитие институтов и оценивает практику. Учебная дисциплина систематизирует эти знания для подготовки юриста. Норма, научное утверждение и учебное объяснение различаются по назначению и юридическому значению.
+#DIAGRAM: type=flow; Нормы -->|применение| Практика; Практика -->|проблемы и вопросы| Научное исследование; Научное исследование -->|обоснование| Предложения; Предложения -->|законодательное решение| Нормы
+#NOTES: Научная рекомендация сама по себе не создаёт обязательного правила поведения. Для изменения действующего права требуется решение уполномоченного субъекта в установленной форме.
+#SLIDE
+#TITLE: Писаная конституция: принятие и начало действия
+#TEXT: История Конституции США показывает, почему необходимо различать создание документа и его вступление в силу. Для конституционного права важен не только текст правил, но и юридический порядок, посредством которого они становятся обязательными для органов власти и участников отношений.
+#TIMELINE: 17 сентября 1787 — принятие Конституции США; 4 марта 1789 — вступление Конституции США в силу
+#NOTES: Обратите внимание, что даты относятся к разным юридическим событиям. Такой подход помогает анализировать и современные акты: необходимо отдельно устанавливать момент принятия, опубликования и начала действия.
+#SOURCE: d5#0
+#SLIDE
+#TITLE: Предмет отрасли: фундаментальные общественные отношения
+#TEXT: Конституционное право закрепляет основы положения личности и организации публичной власти. Оно определяет исходные правила, которые затем конкретизируются другими отраслями. Поэтому его предмет охватывает фундаментальные отношения, а не любое взаимодействие гражданина с государственным органом.
+#DIAGRAM: type=tree; Предмет отрасли > Статус личности, Организация власти, Территориальное устройство; Статус личности > Права и обязанности; Организация власти > Компетенция органов; Территориальное устройство > Уровни публичной власти
+#NOTES: Например, конституционное закрепление права задаёт общую основу его защиты. Конкретная процедура обращения в суд или предоставления выплаты может регулироваться уже процессуальными либо социальными нормами.
+#SLIDE
+#TITLE: Методы регулирования: компетенция и границы поведения
+#TEXT: При организации власти особенно важны обязательные предписания и пределы полномочий. Регулирование статуса личности также использует дозволения, запреты и гарантии.
+#BULLET: Обязывание устанавливает юридически необходимое действие.
+#BULLET: Запрет исключает определённое поведение.
+#BULLET: Дозволение предоставляет возможность действовать в установленных пределах.
+#NOTES: Приведите учебный пример органа, который принимает решение за пределами своей компетенции. Полезность такого решения сама по себе не заменяет требуемого полномочия.
+#SLIDE
+#TITLE: Нормы объединяются в конституционно-правовые институты
+#TEXT: Институт объединяет нормы, регулирующие связанную группу отношений. Конституция служит основой отрасли, однако её содержание развивается в иных правовых актах и практике применения.
+#BULLET: Основы конституционного строя и статус личности.
+#BULLET: Территориальная организация государства.
+#BULLET: Выборы и представительство.
+#BULLET: Организация и компетенция публичной власти.
+#NOTES: Институт избирательного права удобен как пример: он включает связанные правила об участниках, процедурах и гарантиях. При этом институт права не следует смешивать с конкретным государственным учреждением.
+#SOURCE: d3
+#SLIDE
+#TITLE: Субъекты и отношения: пример участия в выборах
+#TEXT: Участниками конституционно-правовых отношений могут выступать личности, государство, его органы, территориальные образования и коллективные субъекты. Их положение различается: гражданин реализует право, а орган действует в пределах компетенции. Конкретное отношение возникает при наличии предусмотренных правом обстоятельств.
+#DIAGRAM: type=flow; Гражданин -->|реализует| Избирательное право; Избирательное право -->|участие| Выборы; Выборы -->|формирование| Представительный орган; Представительный орган -->|обязанность уважать| Конституционные права; Конституционные права -->|принадлежат| Гражданин
+#NOTES: Схема представляет учебный пример формирования выборного представительного органа. Предложите определить участников отношения и отдельно назвать право гражданина и полномочие органа.
+#SLIDE
+#TITLE: Европейские конституции как материал для сравнения
+#TEXT: Принятие писаных конституций позволяет сопоставлять способы закрепления устройства государства и публичной власти. Однако одинаковое название документа не означает тождества институтов. Научное сравнение требует учитывать политические обстоятельства, содержание норм и механизм их реализации.
+#TIMELINE: 3 мая 1791 — принятие Конституции Речи Посполитой; 3 сентября 1791 — принятие Конституции Франции
+#NOTES: Эти документы помогают поставить сравнительный вопрос о способах юридического оформления власти. Чтобы ответить на него, исследователь должен перейти от дат к анализу положений и исторического контекста.
+#SOURCE: d7, d9
+#SLIDE
+#TITLE: Конституция и система источников: российский пример
+#TEXT: Конституция Российской Федерации занимает высшее положение в национальной системе нормативных актов. Конституционное регулирование при этом развивается в законодательстве. При анализе источников необходимо устанавливать юридическую силу документа, компетенцию принявшего его органа и связь конкретного положения с конституционной нормой.
+#TIMELINE: 12 декабря 1993 — принятие Конституции Российской Федерации; 25 декабря 1993 — вступление Конституции Российской Федерации в силу
+#NOTES: Конституцию нельзя отождествлять со всей отраслью конституционного права. Для решения конкретного вопроса необходимо проверять действующие положения и связанные с ними акты, а не ограничиваться названием основного закона.
+#SOURCE: d11
+#SLIDE
+#TITLE: Наука исследует нормы, институты и их развитие
+#TEXT: Наука конституционного права изучает содержание норм, историю институтов, доктрины и практику реализации. Она объясняет противоречия, предлагает понятия и обосновывает возможные изменения. Её предмет шире описания действующего законодательства: исследователь также обращается к историческим и сравнительным материалам.
+#NOTES: Различайте сообщение о содержании нормы и объяснение причин её появления. Научная работа должна показывать, какие материалы и рассуждения подтверждают предложенный вывод.
+#SOURCE: d1#8
+#SLIDE
+#TITLE: Методы науки выбирают под исследовательский вопрос
+#TEXT: Научные методы позволяют получать и проверять знания о праве. Их следует отличать от юридических способов воздействия на поведение участников отношений.
+#BULLET: Формально-юридический анализ раскрывает содержание норм.
+#BULLET: Сравнительный метод сопоставляет правовые решения.
+#BULLET: Исторический метод объясняет развитие институтов.
+#BULLET: Эмпирические методы исследуют практику действия права.
+#NOTES: Английское jurisprudence часто обозначает философию права, поэтому перевод требует внимания к контексту. Например, сравнение конституционных текстов и изучение фактической работы органов отвечают на разные вопросы и требуют разных материалов.
+#SLIDE
+#TITLE: Выводы: норма, практика и научное объяснение
+#TEXT: Конституционное право как отрасль задаёт основы статуса личности и организации власти. Как наука оно исследует содержание, историю и действие этих правил. Для юридического анализа необходимо различать обязательную норму, практику её применения и научное обоснование выводов.
+#DIAGRAM: type=flow; Юридический вопрос -->|поиск основания| Норма; Норма -->|анализ применения| Практика; Практика -->|проверка объяснения| Научный вывод; Научный вывод -->|обоснованные рекомендации| Развитие регулирования
+#NOTES: Предложите завершить разбор любого примера ответами на связанные вопросы: какое правило действует и как оно применяется. Затем отдельно выясните, какие данные позволяют оценить причины и результаты такого регулирования.
+```
+

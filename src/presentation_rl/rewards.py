@@ -10,10 +10,12 @@
 - ключи: доля ``key`` тезиса, найденных на двух его лучших слайдах (заключение — на последнем), с точностью
   до окончаний; каждый ключ считается один раз; среднее по тезисам;
 - длина: штраф за число слайдов вне ожидаемого диапазона (заданного в запросе или выведенного из числа тезисов);
-- визуал: каждый тип до ⌈0,5·N⌉ элементов, всего до 2·N; в пределах — +1, сверх — −1, сумма делится на 2·N
-  (N — содержательные слайды); засчитывается только нарисованное без ошибок; элемент, не нарисованный из-за
+- визуал: каждый тип до ⌈0,5·N⌉ элементов (картинки — до N), всего до 2·N; в пределах — +1, сверх — −1, сумма делится на 2·N
+  (N — содержательные слайды); формулы считаются отдельно: +0,7 за каждую до 2·N, сверх — −0,2 (в той же сумме); засчитывается только нарисованное без ошибок; элемент, не нарисованный из-за
   ограничения слайда (статус ``overflow``: 2 крупных, 3 формулы), — тоже −1; цитата — только найденная в ответах
   инструментов эпизода; ``#IMAGE`` — только при «Картинки: есть», иначе это отдельный штраф;
+- цитата, которой нет в выдаче поиска эпизода, — −0,25 в визуальной сумме (только при поиске; многоточие в цитате —
+  пропуск, части ищутся по порядку);
 - ошибки: элемент, который сборщик не смог отрисовать (``render_error``), и график, у которого функция не определена
   на большей части отрезка (``undefined_plot``), — −0,5 в визуальной сумме; неудачный график (``flat_plot``: выглядит
   прямой, хотя функция не линейная, или сжат выбросом) не засчитывается и не штрафуется; ``#SOURCE``
@@ -45,12 +47,22 @@ from .key_points import KeyPoint
 
 VISUAL_KINDS = ("CHART", "PLOT", "DIAGRAM", "TIMELINE", "IMAGE", "FORMULA", "QUOTE")
 HIDDEN_STATUSES = frozenset({"overflow", "render_error"})  # сборщик элемент не нарисовал
+FAKE_QUOTE_PENALTY = 0.25  # цитата, которой нет в выдаче поиска эпизода (только при поиске; решение 29.10.2026)
 RENDER_ERROR_VALUE = 0.5  # во сколько раз штраф за неотрисованный элемент меньше штрафа за излишек
 COUNTED_STATUSES = frozenset({"ok", "placeholder"})
 ERROR_STATUSES = frozenset({"render_error", "undefined_plot"})  # −0,5; flat_plot — ни плюса, ни минуса  # placeholder — картинка, которую при обучении не скачивают
 LENGTH_FACTOR = 1.3  # содержательных слайдов на тезис, если число слайдов не задано
 VISUAL_TYPE_SHARE = 0.5  # предел на тип: ⌈0,5·N⌉
-VISUAL_TOTAL_PER_SLIDE = 2  # общий предел: 2·N
+IMAGE_TYPE_SHARE = 1  # предел картинок: N — бывают запросы «по фото на слайд» (решение 29.10.2026)
+
+
+def type_limit(kind: str, content_slides: int) -> int:
+    """Предел засчитываемых элементов одного визуального типа: ⌈0,5·N⌉, у картинок — N."""
+    return math.ceil((IMAGE_TYPE_SHARE if kind == "IMAGE" else VISUAL_TYPE_SHARE) * max(1, content_slides))
+VISUAL_TOTAL_PER_SLIDE = 2  # общий предел: 2·N (без формул)
+FORMULA_VALUE = 0.7  # формула — не визуальный элемент: свой бонус и свой предел (решение 28.10.2026)
+FORMULA_TOTAL_PER_SLIDE = 2  # предел формул: 2·N
+FORMULA_OVER_PENALTY = 0.2  # за каждую формулу сверх 2·N (бонуса за неё нет)
 
 
 # --------------------------------------------------------------------------- текст слайдов
@@ -233,14 +245,28 @@ def length_penalty(n_slides: int, low: int, high: int, both_sides: bool) -> floa
 
 
 def _normalize_quote(text: str) -> str:
-    text = text.lower().replace("ё", "е")
+    text = text.replace("\u0301", "").lower().replace("ё", "е")  # знак ударения Википедии («по́ля») — не граница слова
     return " ".join(re.findall(r"[0-9a-zа-я]+", text))
 
 
+def quote_found(quote: str, source: str) -> bool:
+    """Есть ли цитата в выдаче (``source`` — уже ``_normalize_quote``). Многоточие — пропуск: части цитаты
+    ищутся по порядку («Без выражения… даже величайшая любовь может умереть»)."""
+    parts = [p for p in (_normalize_quote(x) for x in re.split(r"…|\.\.\.", quote)) if p]
+    position = 0
+    for part in parts:
+        found = source.find(part, position)
+        if found < 0:
+            return False
+        position = found + len(part)
+    return bool(parts)
+
+
 def visual_score(deck: Deck, report, content_slides: int, images_allowed: bool,
-                 tool_text: str | None) -> tuple[float, dict[str, int], int, int, int]:
+                 tool_text: str | None) -> tuple[float, dict[str, int], int, int, int, int]:
     """Балл за визуал в [−∞, 1], засчитанные элементы по типам, число запрещённых ``#IMAGE``, число элементов,
-    не нарисованных из-за ограничения слайда, и число элементов с ошибкой отрисовки."""
+    не нарисованных из-за ограничения слайда, число элементов с ошибкой отрисовки и число цитат, которых нет
+    в выдаче поиска (``tool_text`` — выдача эпизода; None — режим без поиска: цитаты ни плюс, ни минус)."""
     statuses: dict[tuple[int, int], str] = {}
     if report is not None:
         for item in report.items:
@@ -249,7 +275,7 @@ def visual_score(deck: Deck, report, content_slides: int, images_allowed: bool,
     quotes_source = _normalize_quote(tool_text) if tool_text else ""
     counted: dict[str, int] = {}
     forbidden_images = 0
-    slide_overflow = render_errors = 0
+    slide_overflow = render_errors = fake_quotes = 0
     for number, slide in enumerate(deck.slides, 1):
         for element in slide.elements:
             if element.kind not in VISUAL_KINDS:
@@ -266,21 +292,26 @@ def visual_score(deck: Deck, report, content_slides: int, images_allowed: bool,
                     forbidden_images += 1
                 continue
             if element.kind == "QUOTE":
-                quote = _normalize_quote(element.data.get("text", ""))
-                if status in HIDDEN_STATUSES or not quote or quote not in quotes_source:
+                if status in HIDDEN_STATUSES:
+                    continue
+                if not quote_found(element.data.get("text", ""), quotes_source):
+                    fake_quotes += tool_text is not None
                     continue
             elif status not in COUNTED_STATUSES:
                 continue
             counted[element.kind] = counted.get(element.kind, 0) + 1
     n = max(1, content_slides)
-    per_type = math.ceil(VISUAL_TYPE_SHARE * n)
     total_limit = VISUAL_TOTAL_PER_SLIDE * n
-    within = sum(min(c, per_type) for c in counted.values())
-    over = sum(max(0, c - per_type) for c in counted.values())
+    limits = {kind: type_limit(kind, n) for kind in counted if kind != "FORMULA"}
+    within = sum(min(counted[kind], limit) for kind, limit in limits.items())
+    over = sum(max(0, counted[kind] - limit) for kind, limit in limits.items())
     over += max(0, within - total_limit)
     within = min(within, total_limit)
-    value = (within - over - slide_overflow - RENDER_ERROR_VALUE * render_errors) / total_limit
-    return value, counted, forbidden_images, slide_overflow, render_errors
+    formulas = counted.get("FORMULA", 0)
+    formula_within = min(formulas, FORMULA_TOTAL_PER_SLIDE * n)
+    value = (within + FORMULA_VALUE * formula_within - FORMULA_OVER_PENALTY * (formulas - formula_within) - over - slide_overflow
+             - RENDER_ERROR_VALUE * render_errors - FAKE_QUOTE_PENALTY * fake_quotes) / total_limit
+    return value, counted, forbidden_images, slide_overflow, render_errors, fake_quotes
 
 
 def _call_key(call, lemmatizer: Lemmatizer) -> tuple:
@@ -359,6 +390,7 @@ class RewardResult:
     expected_slides: tuple[int, int] = (0, 0)
     slide_overflow: int = 0  # визуальные элементы сверх ограничения слайда
     render_errors: int = 0  # визуальные элементы, которые сборщик не смог отрисовать
+    fake_quotes: int = 0  # цитаты, которых нет в выдаче поиска
     bad_sources: int = 0  # #SOURCE с id не из этого эпизода
     format: float = 0.0  # 1 − parse_rate
     text_overflow: int = 0  # слайды с не поместившимся текстом
@@ -368,7 +400,7 @@ class RewardResult:
     def components(self) -> dict[str, float]:
         return {"total": self.total, "coverage": self.coverage, "keys": self.keys, "length": self.length,
                 "visual": self.visual, "forbidden_images": self.forbidden_images,
-                "slide_overflow": self.slide_overflow, "render_errors": self.render_errors,
+                "slide_overflow": self.slide_overflow, "render_errors": self.render_errors, "fake_quotes": self.fake_quotes,
                 "bad_sources": self.bad_sources, "format": self.format,
                 "text_overflow": self.text_overflow, "tools": self.tools, "repeats": self.repeats}
 
@@ -403,8 +435,8 @@ def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_ran
     low, high, both = expected_slides(slide_range, len(content_points), has_conclusion)
     length = length_penalty(n, low, high, both)
     content_slides = n - 1 - (1 if has_conclusion and n > 2 else 0) if n > 1 else n
-    visual, visuals, forbidden, slide_overflow, render_errors = visual_score(deck, report, content_slides,
-                                                                             images_allowed, tool_text)
+    visual, visuals, forbidden, slide_overflow, render_errors, fake_quotes = visual_score(
+        deck, report, content_slides, images_allowed, tool_text)
     tools, repeats = tool_penalty(calls, lemmatizer, weights.tool_call, weights.tool_repeat, search,
                                   weights.tool_disabled)
     bad_sources = sum(1 for item in report.items if item.status == "bad_source") if report is not None else 0
@@ -442,7 +474,8 @@ def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_ran
              - weights.bad_source * bad_sources - weights.format * format_penalty
              - weights.text_overflow * overflow_slides)
     return RewardResult(total, coverage, keys, length, visual, forbidden, theses, visuals, (low, high),
-                        slide_overflow, render_errors, bad_sources, format_penalty, overflow_slides, tools, repeats)
+                        slide_overflow, render_errors, fake_quotes, bad_sources, format_penalty, overflow_slides, tools,
+                        repeats)
 
 
 def load_key_points(path) -> dict[str, list[KeyPoint]]:

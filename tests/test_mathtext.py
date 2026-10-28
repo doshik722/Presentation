@@ -31,6 +31,10 @@ from presentation_rl.rendering.mathtext import to_mathtext
         # остаток от деления
         (r"a \equiv b \pmod{N}", r"a \equiv b \;(\mathrm{mod}\;N)"),
         (r"a \bmod n", r"a \;\mathrm{mod}\; n"),
+        # сокращённая дробь без скобок
+        (r"\frac12 + \frac1a + \frac{x}2 + \tfrac a{b}", r"\frac{1}{2} + \frac{1}{a} + \frac{x}{2} + \frac{a}{b}"),
+        (r"\frac{e^{x}}{2}", r"\frac{e^{x}}{2}"),
+        (r"\mathbf w^T\mathbf x(n) + \hat y + \mathbf{R}", r"\mathbf{w}^T\mathbf{x}(n) + \hat{y} + \mathbf{R}"),
         # перенос строки \\ не команда
         (r"a \\ b", r"a \\ b"),
     ],

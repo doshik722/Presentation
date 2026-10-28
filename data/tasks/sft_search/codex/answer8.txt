@@ -1,0 +1,331 @@
+### t059
+
+```text
+[модель]
+#PLAN: композиция выступления → восприятие информации → учебный текст о мониторинге воды → разбор частей → выводы
+#PLAN: ищу принципы расположения аргументов и процессы слушания, чтобы связать композицию с работой аудитории
+<tool_call>
+{"name": "search", "arguments": {"query": "Dispositio"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "Listening"}}
+</tool_call>
+[программа]
+Результаты поиска «Dispositio»:
+d1 | en | Dispositio | Dispositio is the system used for the organization of arguments in the context of Western classical rhetoric. The word is Latin, and can be translated as "organization" or "arrangement".
+[программа]
+Результаты поиска «Listening»:
+d2 | en | Listening | Listening is the act of paying attention to sounds. While often described as attention to sound, listening is increasingly understood as an interpretive process shaped by context and prior experience.
+[модель]
+#PLAN: открываю статьи о композиции и слушании, чтобы выбрать нужные разделы
+<tool_call>
+{"name": "open", "arguments": {"id": "d1"}}
+</tool_call>
+<tool_call>
+{"name": "open", "arguments": {"id": "d2"}}
+</tool_call>
+[программа]
+d1 | en | Dispositio
+d1#0 Введение
+Dispositio is the system used for the organization of arguments in the context of Western classical rhetoric. The word is Latin, and can be translated as "organization" or "arrangement".
+It is the second of five canons of classical rhetoric (the first being inventio, and the remaining being elocutio, memoria, and pronuntiatio) that concern the crafting and delivery of speeches and writing.
+The first part of any rhetorical exercise was to discover the proper arguments to use, which was done by the formalized methods of inventio. The next problem was to select various arguments and organize them into an effective discourse.
+d1#1 Aristotle
+d1#2 Latin rhetoric
+Later writers on rhetoric, such as Cicero and Quintilian, refined this organizational scheme, so that there were eventually six parts: [дальше: read d1#2]
+d1#3   Exordium
+d1#4   Peroratio
+[программа]
+d2 | en | Listening
+d2#0 Введение
+Listening is the act of paying attention to sounds. While often described as attention to sound, listening is increasingly understood as an interpretive process shaped by context and prior experience. It includes listening to the sounds of nature, listening to music, and perhaps most importantly, interpersonal listening, i.e. listening to other human beings. When listening to another person, one hears what they are saying and tries to understand what it means. [дальше: read d2#0]
+d2#1 Interpersonal listening
+Interpersonal listening begins by hearing a speaker producing the sound to be listened to. [дальше: read d2#1]
+d2#2   Process of listening
+d2#3   Active listening
+d2#4   Listening in language learning
+d2#5   Rhetorical listening
+d2#6     Background
+d2#7     Defining rhetorical listening
+d2#8     Practicing rhetorical listening in the classroom
+d2#9 Listening to music
+d2#10 Listening to nature
+[модель]
+#PLAN: читаю обоснование частей речи, функции вступления и финала, а также введение о внимании, понимании и памяти
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#1"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#3"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d1#4"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d2#0"}}
+</tool_call>
+[программа]
+d1#1 | en | Dispositio — Aristotle
+Aristotle defined two essential parts of a discourse: the statement of the case and the proof of the case. For example, in a legal argument, a prosecutor must first declare the charges against the defendant and provide the relevant facts; then he must present the evidence that proves guilt. Aristotle allowed that in practice most discourse also requires an introduction and a conclusion.
+[программа]
+d1#3 | en | Dispositio — Exordium
+The exordium (/ɛɡˈzɔːrdiəm/; meaning "beginning" in Latin; from exordiri, meaning "to begin") was the introductory portion of an oration. The term is Latin and the Greek equivalent is termed the proem, Ancient Greek προοίμιον (prooímion).
+In the exordium, the orator states the purpose of the discourse. In doing this, they need to consider several things:
+What kind of cause is he presenting? For instance, is it an honorable cause (defense of a hero) or a dishonorable one (defense of a murderer)?
+Should a direct beginning be favoured, or should the beginning be more subtle and indirect?
+In what manner ought the speaker to proceed (e.g., humorously or seriously)?
+The speaker should introduce their own character or credentials, so as to make the audience predisposed to believing their arguments.
+If required, or possible, the speaker might also question the character or credentials of his opponent.
+[обрезано: ещё 1700 символов]
+[программа]
+d1#4 | en | Dispositio — Peroratio
+The peroratio ("peroration"), as the final part of a speech, had two main purposes in classical rhetoric: to remind the audience of the main points of the speech (recapitulatio) and to influence their emotions (affectus). The role of the peroration was defined by Greek writers on rhetoric, who termed it epilogos; but it is most often associated with Roman orators, who made frequent use of emotional appeals.
+A famous example was the speech of Marcus Antonius in defence of Aquillius, during which Antonius tore open the tunic of Aquillius to reveal his battle scars.
+During the first century B.C. it was common for two or more speakers to appear on each side in major court cases. In such cases it was considered an honour to be asked to deliver the peroration.
+[программа]
+d2#0 | en | Listening — Введение
+Listening is the act of paying attention to sounds. While often described as attention to sound, listening is increasingly understood as an interpretive process shaped by context and prior experience. It includes listening to the sounds of nature, listening to music, and perhaps most importantly, interpersonal listening, i.e. listening to other human beings. When listening to another person, one hears what they are saying and tries to understand what it means.
+Despite its broad applications, discussions of listening in interdisciplinary fields such as sound studies and art remain underrepresented.
+Interpersonal listening involves complex affective, cognitive, and behavioral processes. Affective processes include the motivation to listen to others; cognitive processes include attending to, understanding, receiving, and interpreting content and relational messages; and behavioural processes include responding to others with verbal and nonverbal feedback.
+Interpersonal listening is a skill for resolving problems. Poor interpersonal listening can lead to misinterpretations, thus causing conflict or dispute. Poor listening can be exhibited by excessive interruptions, inattention, hearing what you want to hear, mentally composing a response, or having a closed mind.
+Listening is also linked to memory.
+[обрезано: ещё 1000 символов]
+[модель]
+#PLAN: проверяю понятие качества воды; для разбора создам авторское учебное выступление без вымышленных результатов измерений в Томской области
+<tool_call>
+{"name": "search", "arguments": {"query": "качество воды"}}
+</tool_call>
+[программа]
+Результаты поиска «качество воды»:
+d3 | ru | Качество воды | Качество воды — это химические, физические и биологические характеристики воды, основанные на стандартах ее использования.
+d4 | en | Water quality | Water quality refers to the chemical, physical, and biological characteristics of water based on the standards of its usage.
+[модель]
+#SLIDE
+#TITLE: Структура публичного выступления и восприятие информации
+#TEXT: Разбор введения, основной части и заключения на теме «Мониторинг качества питьевой воды в населенных пунктах Томской области».
+#TEXT: Авторский учебный пример и его предполагаемый хронометраж.
+#TIMELINE: 00:00 — постановка проблемы; 00:20 — объяснение и аргументы; 01:20 — обобщение и предложение
+#SLIDE
+#TITLE: Введение: зачем выступлению композиция
+#TEXT: Слушателю нужно понять, зачем обсуждается проблема, оценить доводы и удержать главный вывод. Композиция помогает организовать эту работу. Рассмотрим короткое учебное выступление о мониторинге воды: оно предлагает порядок наблюдений, не сообщает результаты обследования Томской области.
+#CHART: type=bar; title=Число предложений в учебном тексте; x=Введение,Основная часть,Заключение; y=3,4,2
+#NOTES: Диаграмма показывает подсчёт предложений в примере на следующих слайдах, а не рекомендуемые пропорции любой речи. Исходный текст выступления к заданию не приложен, поэтому для разбора создан самостоятельный пример. Его предложения следует читать подряд в порядке введения, основной части и заключения.
+#SLIDE
+#TITLE: Части речи и задачи восприятия
+#TEXT: Введение задаёт контекст и цель. Основная часть раскрывает тезис и даёт основания для оценки. Заключение собирает главный смысл и направляет ответ аудитории. Соответствие на схеме показывает ведущую задачу каждой части: внимание, понимание и запоминание нужны на протяжении всей речи.
+#DIAGRAM: type=flow; Введение -->|значимость темы| Внимание; Основная часть -->|объяснение| Понимание; Основная часть -->|доводы| Оценка; Заключение -->|повтор главного| Запоминание; Заключение -->|предложение| Отклик
+#SOURCE: d1#1, d1#3, d1#4, d2#0
+#NOTES: Не следует представлять эту схему как универсальную последовательность изолированных психологических стадий. Например, слушатель может оценить достоверность сообщения уже по вступлению и вернуться к оценке после нового довода. Убедительность основной части зависит от того, понял ли человек используемые понятия.
+#SLIDE
+#TITLE: Введение учебного выступления
+#TEXT: «Жители населённых пунктов Томской области нуждаются в достоверной информации о питьевой воде. Как понять, соответствует ли вода установленным требованиям? Рассмотрим, какие сведения должен давать регулярный мониторинг и почему его результаты важно обсуждать публично».
+#TEXT: Это введение: обозначены адресат, проблема и цель, аргументация ещё не развёрнута.
+#CHART: type=bar; title=Длина предложений введения в словах; x=Контекст,Вопрос,Цель; y=12,7,14
+#NOTES: Короткий вопрос меняет ритм и переводит внимание от общей темы к задаче выступления. Слова подсчитаны по пробелам в приведённом фрагменте. По длине предложений нельзя определить композиционную часть: решающее значение имеет её функция.
+#SLIDE
+#TITLE: Основная часть учебного выступления
+#TEXT: «Для наблюдений нужно определить точки и сроки отбора проб. Пробы исследуют по показателям качества воды, а результаты сопоставляют с установленными требованиями. В сводке следует указывать число проверенных и несоответствующих проб. Поэтому отдельное измерение не заменяет регулярных наблюдений».
+#TEXT: Это основная часть: объяснён порядок работы и сформулирован довод в пользу регулярности.
+#FORMULA: p = \frac{n}{N} \cdot 100\%
+#NOTES: Формула поясняет один возможный показатель сводки: n обозначает число несоответствующих проб, N обозначает все проверенные пробы при N больше нуля. Сравнивать такую долю корректно при сопоставимых показателях, местах и периодах отбора. Для реального выступления довод о регулярности следует подкрепить протоколами наблюдений, которых в этом учебном примере нет.
+#SLIDE
+#TITLE: Заключение учебного выступления
+#TEXT: «Таким образом, регулярный мониторинг даёт основу для обоснованных решений о качестве питьевой воды. Предлагаю публиковать сопоставимые результаты наблюдений по населённым пунктам Томской области».
+#TEXT: Это заключение: обобщён главный тезис и сформулировано предложение. Новые доказательства не вводятся, слушатель получает ориентир для последующего обсуждения.
+#TIMELINE: 01:20 — пауза перед итогом; 01:25 — обобщение тезиса; 01:35 — предложение аудитории
+#NOTES: Здесь показан предполагаемый хронометраж завершения учебной речи. Маркер «таким образом» помогает услышать переход, но сам по себе не делает фрагмент заключением. Композиционную роль задают обобщение сказанного и предложение, связанное с целью выступления.
+#SLIDE
+#TITLE: Выводы: границы частей определяет их функция
+#TEXT: Введение отвечает на вопрос о значимости темы, основная часть раскрывает и обосновывает позицию, заключение закрепляет итог. В учебном примере границы проходят между постановкой вопроса, объяснением мониторинга и предложением публиковать результаты. Композиция облегчает восприятие, когда переходы между этими задачами понятны слушателю.
+#DIAGRAM: type=tree; Проверка композиции > Введение, Основная часть, Заключение; Введение > Зачем слушать; Основная часть > На чём основан тезис; Заключение > Какой итог удержать
+#NOTES: При редактировании полезно проверить, что заключительное предложение отвечает на вопрос, поставленный во вступлении. Если основной довод не поддерживает этот ответ, его нужно уточнить или заменить. Такая проверка помогает сохранить связность даже после сокращения выступления.
+```
+
+### t066
+
+```text
+[модель]
+#PLAN: замысел игры → правила → модель состояния → реализация на 1С → интерфейс → решение и подсказки → проверка → выводы
+#PLAN: ищу сведения о платформе и правила классической задачи на переливание, чтобы определить реализуемый вариант игры
+<tool_call>
+{"name": "search", "arguments": {"query": "1С:Предприятие"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "Water pouring puzzle"}}
+</tool_call>
+[программа]
+Результаты поиска «1С:Предприятие»:
+d1 | ru | 1С:Предприятие | 1С:Предприятие — программный продукт компании «1С», предназначенный для автоматизации деятельности на предприятии.
+d2 | en | 1C:Enterprise | 1С:Enterprise is a low-code development platform developed by 1C Company for creating customizable business automation software.
+[программа]
+Результаты поиска «Water pouring puzzle»:
+d3 | en | Water pouring puzzle | Water pouring puzzles (also called water jug problems, decanting problems, measuring puzzles, or Die Hard with a Vengeance puzzles) are a class of puzzle involving a finite collection of water jugs…
+[модель]
+#PLAN: открываю английские статьи, чтобы найти устройство платформы, ограничения переливания и эталонную задачу
+<tool_call>
+{"name": "open", "arguments": {"id": "d2"}}
+</tool_call>
+<tool_call>
+{"name": "open", "arguments": {"id": "d3"}}
+</tool_call>
+[программа]
+d2 | en | 1C:Enterprise
+d2#0 Введение
+1С:Enterprise is a low-code development platform developed by 1C Company for creating customizable business automation software.
+Карточка статьи:
+Original author: 1C Company
+Type: Rapid application development; low-code development
+Website: www.1c.com; www.1c-dn.com
+d2#1 Overview
+d2#2 History
+d2#3   Versions for DOS
+d2#4   Version 6.0
+d2#5   Versions 7.х (7.0, 7.5, 7.7)
+d2#6   Versions 8.x
+d2#7   Version 8.2
+d2#8   Version 8.3
+d2#9   Enterprise Development Tools
+d2#10 Market presence
+[программа]
+d3 | en | Water pouring puzzle
+d3#0 Введение
+Water pouring puzzles (also called water jug problems, decanting problems, measuring puzzles, or Die Hard with a Vengeance puzzles) are a class of puzzle involving a finite collection of water jugs of known integer capacities (in terms of a liquid measure such as liters or gallons). Initially each jug contains a known integer volume of liquid, not necessarily equal to its capacity.
+Puzzles of this type ask how many steps of pouring water from one jug to another (until either one jug becomes empty or the other becomes full) are needed to reach a goal state, specified in terms of the volume of liquid that must be present in some jug or jugs. [дальше: read d3#0]
+d3#1 Rules
+d3#2 Standard example
+d3#3 Reversibility of actions
+d3#4 Variant with taps and sinks
+The rules are sometimes formulated by adding a tap (a source "jug" with infinite water) and a sink (a drain "jug" that accepts any amount of water without limit). [дальше: read d3#4]
+d3#5   Jug with initial water
+d3#6 Solution for three jugs using a barycentric plot
+[модель]
+#PLAN: читаю устройство платформы, правила и пример с точными объёмами; вариант с краном и сливом в проект не включаю
+<tool_call>
+{"name": "read", "arguments": {"id": "d2#1"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#1"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#2"}}
+</tool_call>
+[программа]
+d2#1 | en | 1C:Enterprise — Overview
+1C:Enterprise provides tools for developing business applications, including ERP, POS, and WMS software.
+The platform utilizes a domain-driven design approach. Application development is conducted using an object-oriented language alongside visual editing interfaces, which are intended to minimize manual coding.
+The platform architecture consists of:
+A data and process layer supporting various database management systems, an application server, and web server components.
+Predefined business components, such as configurable templates for catalogs, documents, ledgers, and business process logic.
+[программа]
+d3#1 | en | Water pouring puzzle — Rules
+It is a common assumption, stated as part of these puzzles, that the jugs in the puzzle are irregularly shaped and unmarked, so that it is impossible to accurately measure any quantity of water that does not completely fill a jug. Other assumptions of these problems may include that no water can be spilled, and that each step pouring water from a source jug to a destination jug stops when either the source jug is empty or the destination jug is full, whichever happens first.
+[программа]
+d3#2 | en | Water pouring puzzle — Standard example
+The standard puzzle of this kind works with three jugs of capacity 8, 5 and 3 liters. These are initially filled with 8, 0 and 0 liters. In the goal state they should be filled with 4, 4 and 0 liters. The puzzle may be solved in seven steps, passing through the following sequence of states (denoted as a bracketed triple of the three volumes of water in the three jugs):
+[8,0,0] → [3,5,0] → [3,2,3] → [6,2,0] → [6,0,2] → [1,5,2] → [1,4,3] → [4,4,0].
+Cowley (1926) writes that this particular puzzle "dates back to mediaeval times" and notes its occurrence in Bachet's 17th-century mathematics textbook.
+[модель]
+#PLAN: для подсказок ищу обход графа, который находит решение с наименьшим числом переливаний при одинаковой стоимости ходов
+<tool_call>
+{"name": "search", "arguments": {"query": "поиск в ширину"}}
+</tool_call>
+[программа]
+Результаты поиска «поиск в ширину»:
+d4 | ru | Поиск в ширину | Поиск в ширину (англ. breadth-first search, BFS) — один из методов обхода графа. Пусть задан граф G=(V,E) и выделена исходная вершина s.
+d5 | en | Breadth-first search | In computer science, breadth-first search (BFS) is an algorithm for searching a tree data structure for a node that satisfies a given property.
+[модель]
+#PLAN: открываю статью о поиске в ширину, чтобы проверить свойство минимального числа переходов
+<tool_call>
+{"name": "open", "arguments": {"id": "d4"}}
+</tool_call>
+[программа]
+d4 | ru | Поиск в ширину
+d4#0 Введение
+Поиск в ширину (англ. breadth-first search, BFS) — один из методов обхода графа. Пусть задан граф G=(V,E) и выделена исходная вершина s.
+Алгоритм поиска в ширину систематически обходит все ребра G для «открытия» всех вершин, достижимых из s, вычисляя при этом расстояние (минимальное количество рёбер) от s до каждой достижимой из s вершины.
+Алгоритм работает как для ориентированных, так и для неориентированных графов.
+Поиск в ширину имеет такое название потому, что в процессе обхода мы идём вширь, то есть перед тем как приступить к поиску вершин на расстоянии k+1, выполняется обход вершин на расстоянии k.
+Поиск в ширину является одним из неинформированных алгоритмов поиска.
+d4#1 Работа алгоритма
+d4#2 Неформальное описание
+d4#3 Формальное описание
+d4#4 Свойства
+Обозначим число вершин и рёбер в графе как |V| и |E| соответственно.
+d4#5   Пространственная сложность
+d4#6   Временная сложность
+d4#7   Полнота
+d4#8   Оптимальность
+d4#9 История и применения
+[модель]
+#SLIDE
+#TITLE: Разработка игры «Переливание вина» на 1С:Предприятии
+#TEXT: Учебный проект логической игры: правила переливания, модель состояния, управляемая форма и проверка решения.
+#TEXT: Вино используется как сюжетное обозначение жидкости в математической головоломке.
+#IMAGE: фотография стеклянного кувшина с красным вином рядом с двумя пустыми стеклянными сосудами
+#SLIDE
+#TITLE: Правила выбранного варианта
+#TEXT: Сосуды А, Б и В вмещают 8, 5 и 3 литра. Начальное наполнение составляет 8, 0 и 0 литров, цель составляет 4, 4 и 0 литров. Переливание продолжается до опустошения источника или заполнения приёмника. Добавлять жидкость, сливать её и останавливать переливание произвольно нельзя.
+#CHART: type=bar; title=Вместимость сосудов в литрах; x=А,Б,В; y=8,5,3
+#SOURCE: d3#1, d3#2
+#NOTES: В описаниях подобных задач встречаются варианты с краном и сливом, поэтому правила выбранного проекта нужно зафиксировать до программирования. Здесь количество жидкости сохраняется на каждом ходу. Изображения сосудов служат иллюстрацией, а точные объёмы задаёт модель игры.
+#SLIDE
+#TITLE: Платформа и способ разработки
+#TEXT: 1С:Предприятие сочетает визуальное конструирование приложения с программированием поведения. Для учебной игры выбираем внешнюю обработку с управляемой формой: интерфейс показывает состояние, а обработчики команд выполняют ходы. Правила переливания оформим отдельной процедурой, чтобы одинаково использовать их в игре и при поиске подсказки.
+#IMAGE: скриншот окна Конфигуратора 1С:Предприятия с деревом метаданных и редактором модуля
+#SOURCE: d2#1
+#NOTES: Внешняя обработка здесь является выбранной архитектурой проекта. Сначала достаточно реализовать один игровой сеанс без сохранения результатов между запусками. Скриншот среды разработки иллюстрирует инструменты платформы и не выдаётся за снимок готовой игры.
+#SLIDE
+#TITLE: Модель состояния и её ограничения
+#TEXT: Состояние задаётся объёмами в сосудах А, Б и В. Вместимости хранятся отдельно и во время партии не меняются. Начинаем с набора (8, 0, 0), завершаем на (4, 4, 0). После любого хода проверяем границы объёмов и сохранение всей жидкости.
+#FORMULA: 0 \leq v_i \leq C_i
+#FORMULA: v_A + v_B + v_C = 8
+#SOURCE: d3#2
+#NOTES: В формулах v обозначает текущий объём, C обозначает вместимость, а индексы A, B, C соответствуют сосудам А, Б, В. Это условия корректности состояния, а достижение цели проверяется отдельно. Если перенести игру на другие вместимости, постоянную в проверке суммы нужно заменить общим начальным объёмом.
+#SLIDE
+#TITLE: Объекты внешней обработки
+#TEXT: На форме создаём реквизиты объёмов, выбора источника и приёмника, счётчика ходов и истории. Обработчик команды обращается к общей логике переливания, затем обновляет представление. История хранит копии предыдущих состояний, чтобы отмена возвращала точные значения и число ходов.
+#DIAGRAM: type=tree; Внешняя обработка > Форма игры, Модуль формы; Форма игры > Показатели объёма, Команды; Модуль формы > Переливание, Проверка победы, История ходов
+#NOTES: Для первой версии реквизиты объёмов можно хранить раздельно, а снимок состояния собирать при выполнении хода. В истории нужна именно копия значений: ссылка на изменяемый объект не сохранит прежнее состояние. Сохранение партий в информационной базе можно добавить позднее.
+#SLIDE
+#TITLE: Управляемая форма игры
+#TEXT: Пользователь видит текущие объёмы и вместимости, выбирает источник и приёмник, затем нажимает «Перелить». Команды «Новая игра», «Отменить» и «Подсказка» дополняют основной ход. Поля объёмов доступны только для просмотра, а сообщение об ошибке объясняет причину отказа.
+#IMAGE: скриншот редактора управляемой формы в Конфигураторе 1С:Предприятия с деревом элементов формы
+#NOTES: Числовые индикаторы показывают уже известное системе состояние и не означают возможность остановить струю в произвольный момент. При победе форма должна явно сообщить о завершении партии. Для новой партии отдельно сбрасываются объёмы, счётчик и история.
+#SLIDE
+#TITLE: Алгоритм одного переливания
+#TEXT: Переносимый объём ограничен остатком источника и свободным местом приёмника. В модуле используем выражение Количество = Мин(ОбъемИсточник, ЕмкостьПриемник - ОбъемПриемник). Затем уменьшаем объём источника и увеличиваем объём приёмника на одну и ту же величину. При нулевом переносе состояние и счётчик сохраняются.
+#FORMULA: q = \min(v_i, C_j - v_j)
+#FORMULA: v_i' = v_i - q, \quad v_j' = v_j + q
+#NOTES: Перед вычислением нужно убедиться, что выбраны разные сосуды и состояние соответствует допустимым границам. Обе новые величины рассчитываются из одного исходного снимка. Отдельная процедура должна возвращать результат хода и причину отказа, чтобы интерфейс и подсказка использовали одинаковые правила.
+#SLIDE
+#TITLE: Обработка команды и проверка победы
+#TEXT: Отказ не создаёт запись в истории и не увеличивает счётчик. Перед успешным ходом сохраняем снимок, затем применяем изменение и проверяем целевое состояние. Совпадение всех целевых объёмов завершает партию. Команда отмены восстанавливает предыдущий снимок и снимает сообщение о победе.
+#DIAGRAM: type=flow; Команда -->|одинаковые сосуды| Отказ; Команда -->|разные сосуды| Проверка переноса; Проверка переноса -->|нулевой объём| Отказ; Проверка переноса -->|положительный объём| Снимок состояния; Снимок состояния -->|сохранён| Применение хода; Применение хода -->|объёмы обновлены| Проверка цели; Проверка цели -->|совпадение| Победа; Проверка цели -->|цель не достигнута| Продолжение
+#NOTES: Форма должна получать итог только после завершения всей операции, чтобы промежуточные значения не выглядели отдельным ходом. Проверку цели удобно оформить функцией, не зависящей от элементов интерфейса. Повторное нажатие команды после победы следует блокировать до отмены или новой партии.
+#SLIDE
+#TITLE: Эталонная последовательность ходов
+#TEXT: В записи состояния объёмы всегда перечислены в порядке А, Б и В. Последовательность показывает решение за семь переливаний. Её можно использовать как сценарий демонстрации и как проверочный пример: после каждой команды состояние должно совпадать с очередным узлом схемы.
+#DIAGRAM: type=flow; 8–0–0 -->|А в Б| 3–5–0 -->|Б в В| 3–2–3 -->|В в А| 6–2–0 -->|Б в В| 6–0–2 -->|А в Б| 1–5–2 -->|Б в В| 1–4–3 -->|В в А| 4–4–0
+#SOURCE: d3#2
+#NOTES: Каждый переход следует проверять тем же алгоритмом, который обслуживает ручную команду. Например, при предпоследнем переливании приёмник уже частично заполнен, поэтому источник отдаёт только доступный свободный объём. Готовая последовательность демонстрирует решение, а минимальность числа ходов можно проверить поиском в ширину.
+#SLIDE
+#TITLE: Подсказка через поиск в ширину
+#TEXT: Представим состояния вершинами графа, а допустимые переливания его рёбрами. Поиск в ширину найдёт путь с минимальным числом ходов, поскольку каждый переход имеет одинаковую стоимость. Сохраняем предшественника и команду для каждого нового состояния, восстанавливаем путь и предлагаем пользователю только следующий ход.
+#DIAGRAM: type=flow; Текущее состояние -->|поместить| Очередь; Очередь -->|извлечь| Проверка цели; Проверка цели -->|цель найдена| Восстановление пути; Проверка цели -->|поиск продолжается| Генерация ходов; Генерация ходов -->|проверить| Посещённые состояния; Посещённые состояния -->|добавить новые| Очередь
+#SOURCE: d4#0
+#NOTES: Состояния нужно отмечать при добавлении в очередь, чтобы циклы переливаний не раздували поиск. Для каждого сосуда перебираются все остальные возможные приёмники, а нулевые переносы отбрасываются. Если очередь опустела, подсказка сообщает об отсутствии пути из текущего состояния.
+#SLIDE
+#TITLE: Проверочные сценарии перед демонстрацией
+#BULLET: Первый допустимый ход даёт ожидаемые объёмы и увеличивает счётчик.
+#BULLET: Пустой источник, полный приёмник и одинаковые сосуды вызывают отказ без изменения состояния.
+#BULLET: Отмена и новая игра согласованно восстанавливают объёмы, историю и счётчик.
+#BULLET: Эталонная последовательность приводит к целевому состоянию и сообщению о победе.
+#CHART: type=bar; title=Ожидаемые объёмы после первого хода в литрах; x=А,Б,В; y=3,5,0
+#SOURCE: d3#2
+#NOTES: Здесь перечислены ожидаемые результаты проверок, а не отчёт о запуске уже реализованной программы. Дополнительно следует проверять сохранение общего объёма после каждого допустимого хода. Подсказку полезно проверить из промежуточного состояния, чтобы исключить выдачу заученного решения только от старта.
+#SLIDE
+#TITLE: Выводы: что определяет корректность игры
+#TEXT: Проект опирается на точные правила и единый алгоритм изменения состояния. Форма отображает результат, история обеспечивает отмену, а поиск по графу даёт подсказки. Готовность к демонстрации подтверждается совпадением с эталонным решением и прохождением проверок допустимых и ошибочных действий.
+#FORMULA: \Delta v_i + \Delta v_j = 0
+#NOTES: Формула напоминает главный инвариант: увеличение одного объёма равно уменьшению другого. Завершённая учебная реализация должна позволять пройти партию, отменить ход и начать заново без ручного изменения реквизитов. Следующим расширением могут стать новые задачи с другими вместимостями и целями.
+```

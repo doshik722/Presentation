@@ -113,6 +113,14 @@ def test_expected_slides_and_length_penalty():
     assert length_penalty(8, 10, 10, True) == pytest.approx(0.2)
 
 
+def test_image_limit_is_one_per_content_slide():
+    slides = [["#TITLE: Тема"]] + [["#TITLE: Гриб", "#IMAGE: гриб"] for _ in range(5)] + [["#TITLE: Итог"]]
+    deck = deck_of(*slides)  # N = 4: картинок до N = 4 (не ⌈0,5·N⌉ = 2), всего до 8
+    value, counted, _, _, _, _ = visual_score(deck, None, 4, images_allowed=True, tool_text=None)
+    assert counted == {"IMAGE": 5}
+    assert value == pytest.approx((4 - 1) / 8)  # пятая сверх предела — −1
+
+
 def test_visual_limits_quotes_and_images():
     slides = [["#TITLE: Тема"]]
     slides += [["#TITLE: Слайд", "#TIMELINE: 1905 — а; 1906 — б"] for _ in range(3)]
@@ -120,16 +128,16 @@ def test_visual_limits_quotes_and_images():
                 "#IMAGE: кот"]]
     slides += [["#TITLE: Итог"]]
     deck = deck_of(*slides)  # 6 слайдов, содержательных N = 4: на тип ⌈0,5·4⌉ = 2, всего 2·4 = 8
-    value, counted, forbidden, _, _ = visual_score(deck, None, 4, images_allowed=False, tool_text="… знание — сила …")
+    value, counted, forbidden, _, _, _ = visual_score(deck, None, 4, images_allowed=False, tool_text="… знание — сила …")
     assert counted == {"TIMELINE": 3, "QUOTE": 1}  # выдуманная цитата не засчитана, картинка запрещена
     assert forbidden == 1
-    assert value == pytest.approx((2 + 1 - 1) / 8)  # третья лента сверх предела типа — минус
-    value, counted, forbidden, _, _ = visual_score(deck, None, 4, images_allowed=True, tool_text=None)
+    assert value == pytest.approx((2 + 1 - 1 - 0.25) / 8)  # третья лента сверх предела — −1, выдуманная цитата — −0,25
+    value, counted, forbidden, _, _, _ = visual_score(deck, None, 4, images_allowed=True, tool_text=None)
     assert counted == {"TIMELINE": 3, "IMAGE": 1} and forbidden == 0  # без поиска цитаты не засчитываются
     line = deck.slides[1].elements[0].line
     report = RenderReport(path=None, items=[ElementReport(2, "TIMELINE", "render_error", line)]
                           + [ElementReport(s, "TIMELINE", "ok", deck.slides[s - 1].elements[0].line) for s in (3, 4)])
-    value, counted, _, _, errors = visual_score(deck, report, 4, images_allowed=False, tool_text=None)
+    value, counted, _, _, errors, _ = visual_score(deck, report, 4, images_allowed=False, tool_text=None)
     assert counted == {"TIMELINE": 2} and errors == 1  # с ошибкой отрисовки не засчитывается
     assert value == pytest.approx((2 - 0.5) / 8)  # и даёт −0,5
 
@@ -159,7 +167,7 @@ def test_visual_over_slide_limit_is_minus_one():
     report = RenderReport(path=None, items=[ElementReport(2, "TIMELINE", "ok", lines[0]),
                                             ElementReport(2, "TIMELINE", "ok", lines[1]),
                                             ElementReport(2, "TIMELINE", "overflow", lines[2])])
-    value, counted, _, overflow, _ = visual_score(deck, report, 1, images_allowed=True, tool_text=None)
+    value, counted, _, overflow, _, _ = visual_score(deck, report, 1, images_allowed=True, tool_text=None)
     # N = 1: на тип ⌈0,5⌉ = 1, всего 2; вторая лента — сверх предела типа (−1), третья не нарисована (−1)
     assert counted == {"TIMELINE": 2} and overflow == 1
     assert value == pytest.approx((1 - 1 - 1) / 2)
@@ -205,7 +213,7 @@ def test_bad_plots_flat_is_zero_undefined_is_error():
     lines = [deck.slides[i].elements[0].line for i in (1, 2)]
     report = RenderReport(path=None, items=[ElementReport(2, "PLOT", "flat_plot", lines[0]),
                                             ElementReport(3, "PLOT", "undefined_plot", lines[1])])
-    value, counted, _, _, errors = visual_score(deck, report, 2, images_allowed=True, tool_text=None)
+    value, counted, _, _, errors, _ = visual_score(deck, report, 2, images_allowed=True, tool_text=None)
     assert counted == {} and errors == 1 and value == pytest.approx(-0.5 / 4)
 
 
@@ -220,3 +228,25 @@ def test_text_overflow_is_penalized_once_per_slide():
     over = score(deck, points, conclusion=False, slide_range=(1, 1), embedder=EMB, lemmatizer=LEM, report=report)
     assert over.text_overflow == 1  # подписи ленты не считаются, слайд — один раз
     assert "матрица и определитель" in slide_texts(deck, report)[0].content  # текст с переполнением виден
+
+
+def test_formulas_are_counted_separately_from_visuals():
+    # N = 1: визуал — до ⌈0,5⌉ = 1 на тип и 2 всего; формулы — до 2 и по 0,7, в общий предел не входят
+    deck = deck_of(["#TITLE: Тема"], ["#TITLE: Слайд", "#TIMELINE: 1905 — а; 1906 — б", "#FORMULA: E = mc^2",
+                                      "#FORMULA: p = mv", "#FORMULA: F = ma"], ["#TITLE: Итог"])
+    value, counted, _, _, _, _ = visual_score(deck, None, 1, images_allowed=True, tool_text=None)
+    assert counted == {"TIMELINE": 1, "FORMULA": 3}
+    assert value == pytest.approx((1 + 0.7 * 2 - 0.2) / 2)  # третья формула сверх 2·N — −0,2 и без бонуса
+
+
+def test_quote_with_ellipsis_and_fake_quote_penalty():
+    from presentation_rl.rewards import quote_found, _normalize_quote
+    source = _normalize_quote("«Без выражения», — предупреждает он, — «даже величайшая любовь может умереть»")
+    assert quote_found("Без выражения… даже величайшая любовь может умереть", source)
+    assert not quote_found("даже величайшая любовь… Без выражения", source)  # порядок частей важен
+    deck = deck_of(["#TITLE: Тема"], ["#TITLE: А", "#QUOTE: Без выражения… даже величайшая любовь может умереть — Р. Стернберг",
+                                      "#QUOTE: Выдуманные слова — Никто"], ["#TITLE: Итог"])
+    value, counted, _, _, _, fake = visual_score(deck, None, 1, images_allowed=True, tool_text="«Без выражения», — предупреждает он, — «даже величайшая любовь может умереть»")
+    assert counted == {"QUOTE": 1} and fake == 1 and value == pytest.approx((1 - 0.25) / 2)
+    _, _, _, _, _, fake = visual_score(deck, None, 1, images_allowed=True, tool_text=None)
+    assert fake == 0  # без поиска цитаты ни плюс, ни минус
