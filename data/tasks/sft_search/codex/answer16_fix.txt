@@ -180,3 +180,183 @@ Its homologous seed storage proteins, in barley, are referred to as hordeins, in
 #NOTES: Следующий практический шаг для пекарни — пробная выпечка с оценкой вкуса, структуры и удобства работы с тестом. По её результатам можно выбрать формы изделий и подготовить описание ассортимента для покупателей.
 ```
 
+### t075
+```
+[модель]
+#PLAN: устройство нейросетей → обучение и архитектуры → развитие технологии → применение в разных сферах → ограничения → внедрение → выводы
+#PLAN: ищу обзор нейросетей и глубокого обучения, а также описание искусственного нейрона для объяснения механизма работы
+<tool_call>
+{"name": "search", "arguments": {"query": "neural network deep learning"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "Artificial neuron"}}
+</tool_call>
+[программа]
+Результаты поиска «neural network deep learning»:
+d1 | en | Neural network (machine learning) | In machine learning, a neural network (NN) or artificial neural network (ANN) is a computational model inspired by the structure and functions of biological neural networks.
+d2 | ru | Нейронная сеть | Нейро́нная сеть (также иску́сственная нейро́нная сеть, ИНС, или просто нейросе́ть) — математическая модель, а также её программное или аппаратное воплощение…
+d3 | en | Deep learning | In machine learning, deep learning (DL) focuses on utilizing multilayered neural networks to perform tasks such as classification, regression, and representation learning.
+d4 | ru | Глубокое обучение | Глубокое обучение (глубинное обучение; англ. deep learning) — совокупность методов машинного обучения (с учителем, с частичным привлечением учителя, без учителя, с подкреплением)…
+[программа]
+Результаты поиска «Artificial neuron»:
+d5 | en | Artificial neuron | An artificial neuron is a mathematical function conceived as a model of a biological neuron in a neural network. The artificial neuron is the elementary unit of an artificial neural network.
+d6 | ru | Искусственный нейрон | Иску́сственный нейро́н (математический нейрон Мак-Каллока — Питтса, формальный нейрон) — узел искусственной нейронной сети, являющийся упрощённой моделью естественного нейрона.
+[модель]
+#PLAN: читаю введение о глубоком обучении для обзора применений и открываю статью об искусственном нейроне для выбора технических разделов
+<tool_call>
+{"name": "read", "arguments": {"id": "d3#0"}}
+</tool_call>
+<tool_call>
+{"name": "open", "arguments": {"id": "d5"}}
+</tool_call>
+[программа]
+d3#0 | en | Deep learning — Введение
+In machine learning, deep learning (DL) focuses on utilizing multilayered neural networks to perform tasks such as classification, regression, and representation learning. The field takes inspiration from biological neuroscience and revolves around stacking artificial neurons into layers and "training" them to process data. The adjective "deep" refers to the use of multiple layers (ranging from three to several hundred or thousands) in the network.
+Methods used can be supervised, semi-supervised or unsupervised.
+Some common deep learning network architectures include fully connected networks, deep belief networks, recurrent neural networks, recurrent Random neural networks, convolutional neural networks, generative adversarial networks, transformers, and neural radiance fields.
+These architectures have been applied to fields including computer vision, speech recognition, natural language processing, machine translation, bioinformatics, drug design, medical image analysis, climate science, material inspection and board game programs, where they have produced results comparable to and in some cases surpassing human expert performance.
+Early forms of neural networks were inspired by information processing and distributed communication nodes in biological systems, particularly the human brain. However, current neural networks do not intend to model the brain function of organisms, and are generally seen as low-quality models for that purpose.
+[программа]
+d5 | en | Artificial neuron
+d5#0 Введение
+An artificial neuron is a mathematical function conceived as a model of a biological neuron in a neural network. The artificial neuron is the elementary unit of an artificial neural network. [дальше: read d5#0]
+d5#1 Basic structure
+d5#2 McCulloch–Pitts (MCP) neuron
+d5#3 Biological models
+Artificial neurons are designed to mimic aspects of their biological counterparts. However a significant performance gap exists between biological and artificial neural networks. In particular single biological neurons in the human brain with oscillating activation function capable of learning the XOR function have been discovered.
+d5#4   Encoding
+d5#5 Physical artificial cells
+d5#6 History
+d5#7 Types of activation function
+The activation function of a neuron is chosen to have a number of properties which either enhance or simplify the network containing the neuron. Crucially, for instance, any multilayer perceptron using a linear activation function has an equivalent single-layer network; a non-linear function is therefore necessary to gain the advantages of a multi-layer network. [дальше: read d5#7]
+d5#8   Step function
+d5#9   Linear combination
+d5#10   Sigmoid
+d5#11   Rectifier
+d5#12 Pseudocode algorithm
+[модель]
+#PLAN: читаю устройство нейрона и историю его появления, затем ищу AlphaFold как конкретный пример научного применения нейросетей
+<tool_call>
+{"name": "read", "arguments": {"id": "d5#1"}}
+</tool_call>
+<tool_call>
+{"name": "read", "arguments": {"id": "d5#6"}}
+</tool_call>
+<tool_call>
+{"name": "search", "arguments": {"query": "AlphaFold"}}
+</tool_call>
+[программа]
+d5#1 | en | Artificial neuron — Basic structure
+For a given artificial neuron k, let there be m+1 inputs with signals x_0 through x_m and weights w_{k0} through w_{km}.
+Usually, the input x_0 is assigned the value +1, which makes it a bias input with w_{k0}=b_k. This leaves only m actual inputs to the neuron: x_1 to x_m.
+The output of the k-th neuron is:
+y_k=\varphi\left(\sum_{j=0}^{m}w_{kj}x_j\right),
+where φ (phi) is the activation function.
+The output is analogous to the axon of a biological neuron, and its value propagates to the input of the next layer, through a synapse. It may also exit the system, possibly as part of an output vector.
+It has no learning process as such. Its activation function weights are calculated, and its threshold value is predetermined.
+[программа]
+d5#6 | en | Artificial neuron — History
+The artificial neuron was first proposed by Warren McCulloch and Walter Pitts in their 1943 paper "A Logical Calculus of the Ideas Immanent in Nervous Activity". It was called the Threshold Logic Unit or Linear Threshold Unit. The model was specifically targeted as a computational model of the "nerve net" in the brain. As an activation function, it employed a threshold, equivalent to using the Heaviside step function.
+Initially, only a simple model was considered, with binary inputs and outputs, some restrictions on the possible weights, and a more flexible threshold value. Since the beginning it was already noticed that any Boolean function could be implemented by networks of such devices, what is easily seen from the fact that one can implement the AND and OR functions, and use them in the disjunctive or the conjunctive normal form.
+Researchers also soon realized that cyclic networks, with feedbacks through neurons, could define dynamical systems with memory, but most of the research concentrated (and still does) on strictly feed-forward networks because of the smaller difficulty they present.
+One important and pioneering artificial neural network that used the linear threshold function was the perceptron, developed by Frank Rosenblatt. This model already considered more flexible weight values in the neurons, and was used in machines with adaptive capabilities.
+[обрезано: ещё 1000 символов]
+[программа]
+Результаты поиска «AlphaFold»:
+d7 | en | AlphaFold | AlphaFold is an artificial intelligence (AI) program developed by DeepMind, a subsidiary of Alphabet, which performs predictions of protein structure.
+d8 | ru | AlphaFold | AlphaFold — программа на базе искусственного интеллекта (AI), разработанная Google DeepMind, которая выполняет предсказания пространственной структуры белка.
+[модель]
+#PLAN: читаю введение AlphaFold, чтобы проверить назначение системы и даты результатов на соревнованиях CASP
+<tool_call>
+{"name": "read", "arguments": {"id": "d7#0"}}
+</tool_call>
+[программа]
+d7#0 | en | AlphaFold — Введение
+AlphaFold is an artificial intelligence (AI) program developed by DeepMind, a subsidiary of Alphabet, which performs predictions of protein structure. It is designed using deep learning techniques.
+AlphaFold 1 (2018) placed first in the overall rankings of the 13th Critical Assessment of Structure Prediction (CASP) in December 2018. It was particularly successful at predicting the most accurate structures for targets rated as most difficult by the competition organizers, where no existing template structures were available from proteins with partially similar sequences.
+AlphaFold 2 (2020) repeated this placement in the CASP14 competition in November 2020. It achieved a level of accuracy much higher than any other entry. It scored above 90 on CASP's global distance test (GDT) for approximately two-thirds of the proteins, a test measuring the similarity between a computationally predicted structure and the experimentally determined structure, where 100 represents a complete match. The inclusion of metagenomic data has improved the quality of the prediction of multiple sequence alignments.
+[обрезано: ещё 1800 символов]
+[модель]
+#SLIDE
+#TITLE: Использование нейросетей в современном мире
+#TEXT: Нейросети распознают изображения и речь, обрабатывают тексты, помогают исследователям и автоматизируют рабочие задачи. Рассмотрим, как они обучаются, где приносят пользу и какие условия необходимы для надёжного применения.
+#IMAGE: коллаж фотографий промышленного робота с камерой и рабочего места исследователя с изображением белковой структуры
+#SLIDE
+#TITLE: Как устроена нейросеть
+#TEXT: Нейросеть состоит из связанных вычислительных элементов — искусственных нейронов. Нейрон объединяет входные сигналы с учётом весов, добавляет смещение и применяет функцию активации. Последовательность таких преобразований позволяет получать сложные зависимости между входными данными и результатом.
+#FORMULA: y=\varphi\left(\sum_{i=1}^{n}w_ix_i+b\right)
+#NOTES: В задаче распознавания изображения входными данными могут быть значения пикселей, а выходом — оценки принадлежности к категориям. Отдельный нейрон выполняет простое преобразование, тогда как возможности сети определяются совместной работой множества элементов. Биологическая аналогия объясняет происхождение идеи, но не означает полного воспроизведения мозга.
+#SOURCE: d5#1
+#SLIDE
+#TITLE: Обучение превращает примеры в параметры
+#TEXT: При обучении сеть получает примеры, формирует прогноз и оценивает ошибку. Алгоритм изменяет веса, чтобы уменьшить выбранную функцию потерь. Качество проверяют на отдельных данных: успешное запоминание обучающих примеров ещё не показывает, насколько хорошо модель справляется с новыми случаями.
+#DIAGRAM: type=flow; Обучающие примеры -->|входные данные| Модель; Модель -->|прогноз| Функция потерь; Правильные ответы -->|сравнение| Функция потерь; Функция потерь -->|градиенты| Обновление весов; Обновление весов -->|новые параметры| Модель
+#NOTES: Обратное распространение ошибки позволяет вычислять, как параметры повлияли на функцию потерь. При обучении с учителем используются известные ответы, а при самоконтролируемом обучении целевой сигнал получают из самих данных. Отдельная проверочная выборка помогает обнаружить переобучение до запуска модели в работу.
+#SLIDE
+#TITLE: Архитектура зависит от задачи
+#TEXT: Разные архитектуры учитывают особенности данных. Свёрточные сети широко используют при обработке изображений, рекуррентные — при работе с последовательностями, трансформеры — при моделировании связей между элементами контекста. Глубокое обучение объединяет подходы, использующие многослойные преобразования представлений.
+#DIAGRAM: type=tree; Архитектуры > Свёрточные сети, Рекуррентные сети, Трансформеры; Свёрточные сети > Пространственные признаки; Рекуррентные сети > Последовательное состояние; Трансформеры > Механизм внимания
+#NOTES: Границы применения этих архитектур пересекаются: например, трансформеры работают и с изображениями. Выбор зависит от структуры данных, доступных вычислений и требований к результату. Большое число параметров само по себе не гарантирует преимущество в конкретной задаче.
+#SOURCE: d3#0
+#SLIDE
+#TITLE: От математической модели к научным результатам
+#TEXT: Развитие нейросетей прошло путь от формального описания нейрона до систем, решающих сложные прикладные задачи. Показательный пример — AlphaFold: нейросетевые методы позволили существенно продвинуть предсказание пространственной структуры белков по данным об их последовательностях.
+#TIMELINE: 1943 — Маккалок и Питтс предложили искусственный нейрон; 2018 — AlphaFold занял первое место в общем рейтинге CASP13; 2020 — AlphaFold 2 повторил результат на CASP14
+#NOTES: Лента показывает отдельные вехи, а не непрерывную историю всех архитектур и алгоритмов. Между ними развивались методы обучения, вычислительная техника и наборы данных. Научный результат оценивают в конкретной постановке задачи, поэтому успех на соревновании нельзя автоматически переносить на любые условия применения.
+#SOURCE: d5#6, d7#0
+#SLIDE
+#TITLE: Текст, речь и повседневные сервисы
+#TEXT: Нейросети применяют для распознавания речи, машинного перевода, поиска и обработки текстов. Генеративные модели помогают составлять черновики, объяснять материал и писать программный код. Голосовой помощник объединяет несколько этапов: преобразование речи в текст, обработку запроса и формирование ответа.
+#DIAGRAM: type=flow; Речь пользователя -->|распознавание| Текст запроса; Текст запроса -->|обработка| Ответ системы; Ответ системы -->|синтез речи| Звуковой ответ; Ответ системы -->|отображение| Текст на экране
+#NOTES: В службе поддержки модель может предложить оператору проект ответа на типовой вопрос. Перед отправкой требуется проверить конкретные сведения, особенно номера заказов, условия услуги и ссылки. Правдоподобная языковая форма не подтверждает фактическую точность текста.
+#SOURCE: d3#0
+#SLIDE
+#TITLE: Компьютерное зрение
+#TEXT: Компьютерное зрение позволяет классифицировать изображения, находить объекты и выделять их границы. Нейросети помогают анализировать дорожные сцены, сортировать продукцию и искать дефекты. Практическое качество зависит от освещения, ракурса и сходства рабочих изображений с данными, использованными при обучении.
+#IMAGE: дорожная сцена с автомобилями и пешеходами с нанесёнными рамками обнаружения объектов
+#NOTES: Классификация отвечает на вопрос, что изображено, а обнаружение дополнительно определяет положение объекта. Для контроля поверхности детали может потребоваться сегментация, выделяющая область дефекта. Испытания должны включать редкие и сложные условия, которые встречаются на реальном рабочем месте.
+#SOURCE: d3#0
+#SLIDE
+#TITLE: Медицина: поддержка анализа изображений
+#TEXT: В медицинской визуализации нейросети используют для анализа снимков и выделения подозрительных областей. Они могут помогать специалисту распределять исследования по приоритету и выполнять повторяющиеся измерения. Применение требует проверки на подходящих данных, поскольку оборудование и характеристики пациентов влияют на результат.
+#IMAGE: врач рассматривает томографические изображения на медицинской рабочей станции
+#NOTES: Полезность системы оценивают с учётом того, какие ошибки она допускает и как они влияют на работу врача. Модель, проверенная на данных одного учреждения, может иначе работать на снимках другого аппарата. Итоговая клиническая интерпретация должна учитывать сведения, которые отсутствуют на самом изображении.
+#SOURCE: d3#0
+#SLIDE
+#TITLE: Промышленность и техническое обслуживание
+#TEXT: На производстве нейросети анализируют изображения изделий и сигналы оборудования. Системы контроля качества выявляют отклонения поверхности, а модели технического состояния ищут признаки неисправностей по вибрации, температуре и другим измерениям. Польза возникает, когда результат анализа связан с понятным действием сотрудника.
+#IMAGE: камера машинного зрения над конвейером с металлическими деталями
+#NOTES: Например, подозрительную деталь можно направить на дополнительную проверку, а не сразу считать браком. При мониторинге оборудования важно различать неисправность и обычное изменение режима работы. Новая партия материала или перенастройка станка могут потребовать повторной оценки модели.
+#SLIDE
+#TITLE: Финансы, торговля и цифровая безопасность
+#TEXT: Нейросети помогают искать подозрительные операции, прогнозировать спрос и подбирать рекомендации. Общая задача — обнаруживать закономерности в больших потоках данных. При работе с аномалиями необходимо учитывать ложные тревоги: необычное событие может оказаться законным и требовать дополнительной проверки.
+#DIAGRAM: type=flow; Поток операций -->|анализ признаков| Оценка риска; Оценка риска -->|обычное поведение| Продолжение обработки; Оценка риска -->|подозрительное поведение| Дополнительная проверка; Дополнительная проверка -->|подтверждённый результат| Обратная связь для модели
+#NOTES: При борьбе с мошенничеством поведение нарушителей меняется после появления новых способов защиты. Поэтому качество модели нужно отслеживать во времени, а разбор ошибок использовать для обновления системы. В торговле рекомендации также следует оценивать по результату для покупателя, учитывая разнообразие предлагаемых товаров.
+#SLIDE
+#TITLE: Наука: предсказание структуры белков
+#TEXT: AlphaFold использует глубокое обучение для предсказания пространственной структуры белков. Такие модели помогают исследователям формулировать гипотезы и планировать эксперименты. Результат представляет собой вычислительное предсказание, точность которого необходимо оценивать для конкретной структуры и исследовательской задачи.
+#IMAGE: ленточная визуализация пространственной структуры белка на экране исследователя
+#NOTES: Форма белка связана с его взаимодействиями и функциями, поэтому сведения о структуре полезны в биологических исследованиях. Однако предсказание структуры не даёт автоматически полного описания поведения молекулы в клетке. Экспериментальная проверка сохраняет значение, особенно для выводов о механизмах взаимодействия.
+#SOURCE: d7#0
+#SLIDE
+#TITLE: Образование и работа с информацией
+#TEXT: Нейросетевые инструменты могут подбирать упражнения, объяснять ошибки и помогать создавать учебные материалы. Их образовательная ценность зависит от способа использования: полезная подсказка направляет рассуждение ученика. Преподаватель определяет цели, проверяет корректность содержания и оценивает самостоятельность выполнения работы.
+#DIAGRAM: type=flow; Ответ ученика -->|анализ затруднения| Подсказка; Подсказка -->|новая попытка| Решение ученика; Решение ученика -->|проверка понимания| Преподаватель; Преподаватель -->|выбор следующего шага| Новое задание
+#NOTES: Например, при ошибке в решении задачи система может предложить проверить единицы измерения вместо выдачи готового ответа. Ученик должен уметь объяснить ход решения своими словами и воспроизвести его без помощника. Учебные материалы, созданные моделью, требуют проверки на фактические и методические ошибки.
+#SLIDE
+#TITLE: Ограничения и цена ошибок
+#TEXT: Нейросети могут ошибаться на незнакомых данных, воспроизводить смещения обучающей выборки и выдавать недостоверные утверждения. Качество нельзя свести к одной общей оценке. Для обнаружения событий важны точность положительных ответов и полнота, а для генерации — проверяемость содержания и соответствие задаче.
+#FORMULA: \mathrm{Precision}=\frac{TP}{TP+FP},\qquad \mathrm{Recall}=\frac{TP}{TP+FN}
+#NOTES: TP обозначает верно обнаруженные положительные случаи, FP — ложные срабатывания, FN — пропущенные положительные случаи. Снижение порога обнаружения может увеличить полноту одновременно с ростом числа ложных тревог. Помимо качества ответов необходимо учитывать защиту данных, вычислительные затраты и возможность объяснить результат пользователю.
+#SLIDE
+#TITLE: Как внедрять нейросеть в рабочий процесс
+#TEXT: Внедрение начинается с конкретной задачи и измеримого критерия качества. Затем оценивают данные, выбирают модель и проверяют её на характерных примерах. До запуска определяют ответственность за решения, порядок обработки сомнительных ответов и условия, при которых потребуется обновление системы.
+#DIAGRAM: type=flow; Рабочая задача -->|критерии успеха| Проверка данных; Проверка данных -->|подготовка| Испытание модели; Испытание модели -->|приемлемое качество| Рабочее применение; Испытание модели -->|ошибки| Доработка; Рабочее применение -->|наблюдение за качеством| Мониторинг; Мониторинг -->|изменение условий| Доработка
+#NOTES: Полезно сравнить модель с текущим процессом и более простым способом решения задачи. Пилот должен показывать не только качество прогнозов, но и влияние на время работы и число исправлений. После запуска необходимы наблюдение за изменениями данных и возможность вернуться к проверенному порядку действий.
+#SLIDE
+#TITLE: Выводы
+#TEXT: Нейросети расширяют возможности анализа данных и создания материалов в повседневных сервисах, промышленности, образовании и науке. Их практическая ценность определяется сочетанием подходящей задачи, качественных данных и проверки результатов. Надёжное применение включает участие специалистов и наблюдение за качеством после запуска.
+#IMAGE: инженер и аналитик совместно рассматривают результаты системы на рабочем мониторе
+#NOTES: При оценке нового применения полезно сформулировать, какую конкретную работу система облегчает и как это будет проверено. Следует заранее понимать последствия ошибки и способ её обнаружения. Такой подход позволяет использовать сильные стороны нейросетей и сохранять контроль над результатом.
+```
+

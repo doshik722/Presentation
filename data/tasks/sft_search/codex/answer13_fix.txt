@@ -118,7 +118,7 @@ The idea that some languages are superior to others and that lesser languages ma
 #TEXT: Language provides shared signs and rules. Thinking involves working with ideas and information. We use language to express thoughts, but producing a sentence and understanding an idea are different tasks.
 #TEXT: Язык предоставляет общие знаки и правила. Мышление позволяет работать с идеями и информацией. Мы выражаем мысли словами, однако построение предложения и понимание идеи — разные задачи.
 #NOTES: Consider a familiar word that you can pronounce without understanding its meaning. This shows why fluent speech alone does not guarantee understanding. Перевод: вспомните знакомое слово, которое вы можете произнести, не понимая его значения. Этот пример показывает, почему свободная речь сама по себе не гарантирует понимания.
-#SOURCE: d2, d4
+#SOURCE: d1, d4
 #SLIDE
 #TITLE: Influence and determination / Влияние и предопределение
 #TEXT: Linguistic relativity asks how language influences cognition. A much stronger claim says that language determines the limits of thought. Evidence of influence should not automatically be treated as evidence of complete determination.
@@ -139,7 +139,7 @@ The idea that some languages are superior to others and that lesser languages ma
 #TEXT: Язык может быть обращён к самому говорящему. Мысленное повторение объяснения или напоминание о цели придаёт мысли словесную форму, которую можно рассмотреть и уточнить.
 #QUOTE: the social/cultural tool or symbol system of language, first used for interpersonal communication but later employed by the child overtly for intrapersonal communication and self-guidance — M. Gholami et al., «Private speech and cognitive development: A review of the two theories»
 #NOTES: Before an important conversation, people often imagine what they will say. Use this familiar example to connect communication with planning. Перевод: перед важным разговором люди нередко представляют свои будущие реплики. Этот знакомый пример связывает общение с планированием.
-#SOURCE: d10, d8#1
+#SOURCE: d8#1
 #SLIDE
 #TITLE: From speaking aloud to speaking internally / От внешней речи к внутренней
 #TEXT: Children may talk aloud while guiding their own actions. In Vygotsky’s account, this speech becomes increasingly internal as development continues. The transition describes a developmental tendency rather than a fixed timetable for every child.

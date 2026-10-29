@@ -507,11 +507,22 @@ def collect(sft_dir: str | Path, tasks_path: str | Path, offline_path: str | Pat
 
 # --------------------------------------------------------------------------- настоящая выдача
 
-_ID_RE = re.compile(r"\bd(\d+)(?=#\d+|\b)")
+_ID_RE = re.compile(r"\bd(\d+)(?:#(\d+))?\b")
 
 
-def _remap(text: str, mapping: dict[int, int]) -> str:
-    return _ID_RE.sub(lambda m: f"d{mapping.get(int(m.group(1)), int(m.group(1)))}", text)
+def _remap(text: str, articles: dict[int, int], sections: dict[tuple[int, int], int] | None = None) -> str:
+    """Переводит id составителя в настоящие: статьи — по названию в выдаче поиска, разделы — по названию
+    в оглавлении (``sections``: (настоящий номер статьи, номер раздела у составителя) → настоящий номер раздела)."""
+    sections = sections or {}
+
+    def one(m: re.Match) -> str:
+        article = articles.get(int(m.group(1)), int(m.group(1)))
+        if m.group(2) is None:
+            return f"d{article}"
+        section = int(m.group(2))
+        return f"d{article}#{sections.get((article, section), section)}"
+
+    return _ID_RE.sub(one, text)
 
 
 def _plain(text: str) -> str:
@@ -533,75 +544,124 @@ def _results(text: str) -> list[tuple[int, str, str]]:
             if (m := _RESULT_RE.match(line))]
 
 
-def _toc(text: str) -> dict[int, str]:
-    return {int(m.group(1)): m.group(2).strip() for line in text.splitlines()[1:]
-            if (m := re.match(r"^d\d+#(\d+) (.+)$", line))}
+def _toc(text: str) -> list[tuple[int, str]]:
+    return [(int(m.group(1)), m.group(2).strip()) for line in text.splitlines()[1:]
+            if (m := re.match(r"^d\d+#(\d+) (.+)$", line))]
 
 
-def _compare(call: ToolCall, teacher: str, real: str, mapping: dict[int, int], where: str) -> list[str]:
-    """Расхождения выдачи составителя с настоящей; для поиска пополняет перевод id составителя в настоящие."""
-    problems = []
+@dataclass
+class _Matching:
+    """Перевод id составителя в настоящие и то, чего в настоящей выдаче не нашлось."""
+    articles: dict[int, int] = field(default_factory=dict)  # номер у составителя → настоящий
+    sections: dict[tuple[int, int], int] = field(default_factory=dict)  # (настоящая статья, раздел у составителя) → настоящий
+    missing_articles: dict[int, str] = field(default_factory=dict)  # номер у составителя → «название (язык)»
+    missing_sections: dict[tuple[int, int], str] = field(default_factory=dict)  # (настоящая статья, раздел у составителя) → название
+
+
+def _compare(call: ToolCall, teacher: str, real: str, match: _Matching, where: str) -> tuple[list[str], list[str]]:
+    """Расхождения выдачи составителя с настоящей: (ошибки, замечания). Пополняет перевод id.
+
+    Ошибка — только то, что меняет смысл шагов модели: открыта или прочитана другая статья либо другой раздел.
+    Статьи выдачи поиска и разделы оглавления, которых нет в настоящей выдаче, запоминаются: ошибкой они станут,
+    только если модель их использует (проверка в ``substitute``). Текст разделов составитель оформлял по-своему
+    (формулы, таблицы, списки, подписи картинок, карточка статьи) — несовпадение текста только замечание;
+    содержание слайдов проверяет ``check_episode`` по настоящей выдаче."""
+    errors, notes = [], []
     if call.name == "search":
         found = {(lang, title): number for number, lang, title in _results(real)}
         for number, lang, title in _results(teacher):
             if (lang, title) in found:
-                mapping[number] = found[(lang, title)]
+                match.articles[number] = found[(lang, title)]
             else:
-                problems.append(f"{where}: в настоящей выдаче нет статьи «{title}» ({lang})")
-    elif call.name == "open":
+                match.missing_articles[number] = f"{title} ({lang})"
+        return errors, notes
+    teacher = _remap(teacher, match.articles, match.sections)
+    if call.name == "open":
         if teacher.splitlines()[0] != real.splitlines()[0]:
-            problems.append(f"{where}: оглавление другой статьи: «{real.splitlines()[0]}»")
+            errors.append(f"{where}: оглавление другой статьи: «{real.splitlines()[0]}»")
+            return errors, notes
+        article = int(_ID_RE.match(real.splitlines()[0]).group(1))
         real_toc = _toc(real)
-        for index, heading in _toc(teacher).items():
-            if real_toc.get(index) != heading:
-                problems.append(f"{where}: раздел #{index} «{heading}», в настоящем оглавлении — «{real_toc.get(index)}»")
+        position = 0
+        for index, heading in _toc(teacher):  # по порядку: одинаковые названия разделов сопоставляются по очереди
+            later = [i for i, (_, h) in enumerate(real_toc) if i >= position and h == heading]
+            if later:
+                position = later[0] + 1
+                match.sections[(article, index)] = real_toc[later[0]][0]
+            else:
+                match.missing_sections[(article, index)] = heading
         texts = "\n".join(line for line in teacher.splitlines()[1:] if not re.match(r"^d\d+#\d+ ", line))
-        for piece in _missing_fragments(texts, real):
-            problems.append(f"{where}: текста составителя нет в настоящем оглавлении: «{piece[:60]}»")
+        notes += [f"{where}: текст оглавления оформлен иначе: «{piece[:60]}»" for piece in _missing_fragments(texts, real)]
     else:  # read
         if teacher.splitlines()[0] != real.splitlines()[0]:
-            problems.append(f"{where}: заголовок «{teacher.splitlines()[0][:70]}», настоящий — «{real.splitlines()[0][:70]}»")
-        for piece in _missing_fragments("\n".join(teacher.splitlines()[1:]), real):
-            problems.append(f"{where}: текста составителя нет в настоящем разделе: «{piece[:60]}»")
-    return problems
+            errors.append(f"{where}: заголовок «{teacher.splitlines()[0][:70]}», настоящий — «{real.splitlines()[0][:70]}»")
+            return errors, notes
+        notes += [f"{where}: текст раздела оформлен иначе: «{piece[:60]}»"
+                  for piece in _missing_fragments("\n".join(teacher.splitlines()[1:]), real)]
+    return errors, notes
 
 
 def episode_text(turns: list[Turn]) -> str:
     return "\n".join(("[модель]" if t.role == "model" else "[программа]") + "\n" + t.text for t in turns)
 
 
+def _unmatched_used(example: Example, match: _Matching, where: str) -> list[str]:
+    """Статьи и разделы, которых нет в настоящей выдаче, но которые модель использует (вызовы, #SOURCE, #PLAN)."""
+    errors = []
+    for turn in example.turns:
+        if turn.role != "model":
+            continue
+        for m in _ID_RE.finditer(turn.text):
+            number = int(m.group(1))
+            if number in match.missing_articles:
+                errors.append(f"{where}: модель использует d{number} — «{match.missing_articles[number]}», "
+                              "в настоящей выдаче поиска её нет")
+            elif m.group(2) is not None:
+                key = (match.articles.get(number, number), int(m.group(2)))
+                if key in match.missing_sections:
+                    errors.append(f"{where}: модель использует {m.group(0)} — раздел «{match.missing_sections[key]}», "
+                                  "в настоящем оглавлении его нет")
+    return list(dict.fromkeys(errors))
+
+
 def substitute(example: Example, tools, task: Task) -> tuple[Example | None, list[str], list[str]]:
     """Подставляет настоящую выдачу вместо выдачи составителя; возвращает пример (None — расхождения),
-    расхождения и ошибки, замечания проверки по настоящей выдаче."""
+    ошибки и замечания (в том числе проверки по настоящей выдаче)."""
     where = f"{example.model}/{example.batch}/{example.id}"
     tools.reset()
-    mapping: dict[int, int] = {}
+    match = _Matching()
     turns: list[Turn] = []
     pending: list[ToolCall] = []
     problems: list[str] = []
+    notes: list[str] = []
     for turn in example.turns:
         if turn.role == "model":
-            text = _remap(turn.text, mapping)
+            text = _remap(turn.text, match.articles, match.sections)
             turns.append(Turn("model", text))
             pending = parse_tool_calls(text)[1]
             continue
         call = pending.pop(0)
         real = tools.call(call.name, call.argument)
-        teacher = _remap(turn.text, mapping) if call.name != "search" else turn.text
-        problems += _compare(call, teacher, real, mapping, f"{where}: {call.name}({call.argument})")
+        errors, found = _compare(call, turn.text, real, match, f"{where}: {call.name}({call.argument})")
+        problems += errors
+        notes += found
         turns.append(Turn("program", real))
+    problems += _unmatched_used(example, match, where)
     if problems:
-        return None, problems, []
+        return None, problems, notes
     # реплики модели — с окончательным переводом id (#PLAN мог упомянуть статью раньше, чем её нашёл поиск)
     originals = iter(t.text for t in example.turns if t.role == "model")
-    turns = [Turn("model", _remap(next(originals), mapping)) if t.role == "model" else t for t in turns]
-    turns, answer, errors, notes = check_episode(episode_text(turns), task, example.images, where, real=True)
+    turns = [Turn("model", _remap(next(originals), match.articles, match.sections)) if t.role == "model" else t
+             for t in turns]
+    turns, answer, errors, checked = check_episode(episode_text(turns), task, example.images, where, real=True)
     if errors:
-        return None, errors, notes
-    renumbered = [f"{where}: id составителя переведены в настоящие: "
-                  + ", ".join(f"d{a}→d{b}" for a, b in sorted(mapping.items()) if a != b)] if any(
-        a != b for a, b in mapping.items()) else []
-    return replace(example, turns=turns, answer=answer), [], renumbered + notes
+        return None, errors, notes + checked
+    moved = [f"d{a}→d{b}" for a, b in sorted(match.articles.items()) if a != b]
+    moved += [f"d{a}#{s}→d{a}#{t}" for (a, s), t in sorted(match.sections.items()) if s != t]
+    unused = [f"{where}: статьи выдачи составителя, которых нет в настоящей выдаче (модель их не использует): "
+              + "; ".join(match.missing_articles.values())] if match.missing_articles else []
+    renumbered = [f"{where}: id составителя переведены в настоящие: " + ", ".join(moved)] if moved else []
+    return replace(example, turns=turns, answer=answer), [], renumbered + unused + notes + checked
 
 
 # --------------------------------------------------------------------------- сборка эпизода

@@ -203,20 +203,44 @@ def test_real_output_is_substituted_and_ids_are_renumbered(tmp_path):
     assert "#SOURCE: d1#2, d3" in example.answer and "английская статья d3" in example.answer
 
 
-def test_teacher_text_not_in_real_section_is_rejected(tmp_path):
+def _substitute(tmp_path, teacher):
     from presentation_rl.sft_search import substitute
     from presentation_rl.tasks import load_tasks
-    report = make_dir(tmp_path, TEACHER.replace("Шаг подбирают так… [обрезано", "Шаг выбирают наугад… [обрезано"))
+    report = make_dir(tmp_path, teacher)
+    assert report.errors == []
     task = {t.id: t for t in load_tasks(TASKS, split="sft")}["t007"]
-    example, problems, _ = substitute(report.examples[0], real_tools(tmp_path), task)
-    assert example is None and any("текста составителя нет в настоящем разделе" in p for p in problems)
+    return substitute(report.examples[0], real_tools(tmp_path), task)
 
 
-def test_glued_fragment_from_elsewhere_is_rejected(tmp_path):
-    from presentation_rl.sft_search import substitute
-    from presentation_rl.tasks import load_tasks
-    glued = TEACHER.replace("Шаг подбирают так… [обрезано", "Шаг подбирают так… Общая идея метода: двигаться против градиента. [обрезано")
-    report = make_dir(tmp_path, glued)
-    task = {t.id: t for t in load_tasks(TASKS, split="sft")}["t007"]
-    example, problems, _ = substitute(report.examples[0], real_tools(tmp_path), task)
-    assert example is None and any("Общая идея метода" in p for p in problems)
+def test_teacher_text_formatted_differently_is_only_a_note(tmp_path):
+    # составитель оформлял текст по-своему (формулы, таблицы, списки); содержание проверяет check_episode
+    example, problems, notes = _substitute(tmp_path, TEACHER.replace("Шаг подбирают так… [обрезано", "Шаг выбирают наугад… [обрезано"))
+    assert problems == [] and example is not None
+    assert any("текст раздела оформлен иначе" in n and "Шаг выбирают наугад" in n for n in notes)
+
+
+def test_other_section_read_is_rejected(tmp_path):
+    # составитель читал раздел, которого в настоящем оглавлении нет
+    teacher = TEACHER.replace("d1#2 Выбор шага", "d1#2 Сходимость").replace("Градиентный спуск — Выбор шага", "Градиентный спуск — Сходимость")
+    example, problems, _ = _substitute(tmp_path, teacher)
+    assert example is None and any("заголовок" in p and "Сходимость" in p for p in problems)
+    assert any("модель использует d1#2" in p for p in problems)
+
+
+def test_sections_are_renumbered_by_heading(tmp_path):
+    # на сайте составитель видел пустой раздел, которого инструмент не выводит: номера после него сдвинуты
+    teacher = (TEACHER.replace("d1#1 Описание\n  d1#2 Выбор шага", "d1#1 История\nd1#2 Описание\n  d1#3 Выбор шага")
+               .replace('"d1#2"', '"d1#3"').replace("d1#2 | ru", "d1#3 | ru").replace("#SOURCE: d1#2", "#SOURCE: d1#3"))
+    example, problems, notes = _substitute(tmp_path, teacher)
+    assert problems == [] and any("d1#3→d1#2" in n for n in notes)
+    assert '"d1#2"' in example.turns[4].text and "#SOURCE: d1#2, d3" in example.answer
+
+
+def test_unused_teacher_article_is_a_note_used_one_is_an_error(tmp_path):
+    extra = "d2 | en | Gradient descent | Gradient descent is a method.\nd3 | ru | Метод сопряжённых градиентов | Метод…"
+    teacher = TEACHER.replace("d2 | en | Gradient descent | Gradient descent is a method.", extra)
+    example, problems, notes = _substitute(tmp_path, teacher)
+    assert problems == [] and any("Метод сопряжённых градиентов" in n for n in notes)
+    (tmp_path / "used").mkdir()
+    example, problems, _ = _substitute(tmp_path / "used", teacher.replace("#SOURCE: d1#2, d2", "#SOURCE: d1#2, d2, d3"))
+    assert example is None and any("модель использует d3" in p for p in problems)
