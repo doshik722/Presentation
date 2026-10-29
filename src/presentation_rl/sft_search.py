@@ -73,7 +73,7 @@ _OUTPUT_HEADS = (
     ("open", re.compile(r"^d\d+ \| (?:ru|en) \| [^|]+$")),  # оглавление: три поля (у строки выдачи поиска — четыре)
     ("read", re.compile(r"^d\d+#\d+ \| (?:ru|en) \| .+$")),
 )
-_RESULT_RE = re.compile(r"^d(\d+) \| (ru|en) \| (.+?) \| (.*)$")
+_RESULT_RE = re.compile(r"^d(\d+) \| (ru|en) \| (.+?) \|(?: (.*))?$")  # начало может быть пустым (статья-список)
 _ARTICLE_RE = re.compile(r"^d(\d+)$")
 _SECTION_RE = re.compile(r"^d(\d+)(?:#(\d+))?$")
 DEFAULT_CONTACT = "https://github.com/doshik722"  # контакт для User-Agent Википедии, как в тетрадках

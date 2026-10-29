@@ -244,3 +244,10 @@ def test_unused_teacher_article_is_a_note_used_one_is_an_error(tmp_path):
     (tmp_path / "used").mkdir()
     example, problems, _ = _substitute(tmp_path / "used", teacher.replace("#SOURCE: d1#2, d2", "#SOURCE: d1#2, d2, d3"))
     assert example is None and any("модель использует d3" in p for p in problems)
+
+
+def test_search_result_with_empty_intro_is_valid():
+    # у статей-списков («Deaths in April 2010») введение пустое — строка выдачи кончается на «|»
+    from presentation_rl.sft_search import _RESULT_RE
+    assert _RESULT_RE.match("d9 | en | Deaths in April 2010 |").group(3) == "Deaths in April 2010"
+    assert _RESULT_RE.match("d9 | en | Deaths in April 2010 | ").group(3) == "Deaths in April 2010"
