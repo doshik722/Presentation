@@ -257,7 +257,7 @@ class _Ledger:
             if not match:
                 errors.append(f"{where}: строка выдачи не в формате «id | язык | название | начало»: «{line[:60]}»")
                 continue
-            number, lang, title, snippet = int(match.group(1)), match.group(2), match.group(3), match.group(4)
+            number, lang, title, snippet = int(match.group(1)), match.group(2), match.group(3), match.group(4) or ""
             known = next((d for d in self.docs if (d.lang, d.title) == (lang, title)), None)
             expected = known.number if known else len(self.docs) + 1
             if number != expected:

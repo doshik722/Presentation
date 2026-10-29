@@ -246,8 +246,11 @@ def test_unused_teacher_article_is_a_note_used_one_is_an_error(tmp_path):
     assert example is None and any("модель использует d3" in p for p in problems)
 
 
-def test_search_result_with_empty_intro_is_valid():
+def test_search_result_with_empty_intro_is_valid(tmp_path):
     # у статей-списков («Deaths in April 2010») введение пустое — строка выдачи кончается на «|»
     from presentation_rl.sft_search import _RESULT_RE
     assert _RESULT_RE.match("d9 | en | Deaths in April 2010 |").group(3) == "Deaths in April 2010"
     assert _RESULT_RE.match("d9 | en | Deaths in April 2010 | ").group(3) == "Deaths in April 2010"
+    with_list = TEACHER.replace("d2 | en | Gradient descent | Gradient descent is a method.",
+                                "d2 | en | Gradient descent | Gradient descent is a method.\nd3 | en | Deaths in April 2010 |")
+    assert make_dir(tmp_path, with_list).errors == []  # и проверка эпизода такую строку принимает
