@@ -120,3 +120,32 @@ def test_several_values_in_one_cell_are_separated():
     (_, text), = html_tables(html).tables
     assert text.splitlines()[1:] == ["Год | Лауреаты", "1958 | Павел Черенков; Игорь Тамм",
                                      "1964 | Николай Басов; Александр Прохоров", "1975 | Андрей Сахаров; премия мира"]
+
+
+COLUMNS_HTML = """<div class="mw-parser-output"><p>Введение.</p>
+<div class="mw-heading mw-heading2"><h2 id="Виды">Виды психических процессов</h2></div>
+<div class="metadata ambox">Этот раздел представляет собой неупорядоченный список.</div>
+<div class="mw-heading mw-heading3"><h3 id="П">Познавательные</h3></div>
+<div class="columns" style=";column-count:2; column-width: 30em;">
+<ul><li><a href="/wiki/x">Ощущение</a></li>
+<li>Память<ul><li>Кратковременная</li></ul></li></ul>
+</div>
+<div class="mw-heading mw-heading2"><h2 id="См">См. также</h2></div>
+<div class="columns" style="column-count:2"><ul><li>Высшие психические функции</li></ul></div>
+</div>"""
+COLUMNS_EXTRACT = ("Введение.\n\n\n== Виды психических процессов ==\n\n\n=== Познавательные ===\n\n\n"
+                   "== См. также ==\n\n")
+
+
+def test_lists_in_columns_go_to_their_sections():
+    # простой текст выбрасывает div вместе с содержимым: без HTML раздел «Познавательные» пустой и отбрасывается
+    assert [s.heading for s in split_sections(COLUMNS_EXTRACT)] == [""]
+    found = html_tables(COLUMNS_HTML)
+    numbers = align_headings(found.headings, ["Виды психических процессов", "Познавательные", "См. также"])
+    lists = {}
+    for count, text in found.tables:
+        lists.setdefault(numbers[count - 1] if count else 0, []).append(text)
+    sections = split_sections(COLUMNS_EXTRACT, lists)
+    assert [s.heading for s in sections] == ["", "Виды психических процессов", "Познавательные"]
+    assert sections[2].text == "Ощущение\nПамять\nКратковременная"
+    assert "Высшие психические функции" not in json.dumps([s.text for s in sections], ensure_ascii=False)

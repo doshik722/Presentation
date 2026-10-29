@@ -5,8 +5,9 @@
 
 - ``searches.jsonl`` — выдача поиска: язык, запрос, лимит, язык межъязыковых ссылок и статьи (без текста);
 - ``pages.jsonl`` — статьи по названиям (введение, номер правки, URL); нет статьи — ``page: null``;
-- ``articles.jsonl`` — статьи целиком по разделам, с таблицами (``tables: true``); записи без таблиц, сохранённые
-  раньше, не читаются — такие статьи запрашиваются заново.
+- ``articles.jsonl`` — статьи целиком по разделам, с таблицами и списками в колонках (``tables`` — версия формата
+  ``ARTICLE_FORMAT``); записи старого формата не читаются — такие статьи запрашиваются заново: 20.10.2026 добавились
+  таблицы (``tables: true``), 29.10.2026 — списки в колонках (``tables: 2``).
 
 Так роллауты одного задания видят одну и ту же выдачу, а повторные прогоны и сравнения моделей идут по тем же
 ответам. ``client=None`` — только сохранённое: промах — ошибка ``CacheMiss`` (для точного воспроизведения).
@@ -19,6 +20,9 @@ import threading
 from pathlib import Path
 
 from .wiki import Article, PageInfo, WikiClient
+
+
+ARTICLE_FORMAT = 2  # 1 (true) — таблицы и карточка; 2 — ещё списки в колонках (wiki_tables.list_text)
 
 
 class CacheMiss(LookupError):
@@ -42,8 +46,8 @@ class WikiCache:
             page = PageInfo(**record["page"]) if record["page"] else None
             self.page_infos[(record["lang"], record["requested"])] = page
         for record in self._read("articles.jsonl"):
-            if not record.get("missing") and not record.get("tables"):
-                continue  # сохранено до того, как в статьи добавились таблицы (20.10.2026) — запросим заново
+            if not record.get("missing") and int(record.get("tables", 0)) < ARTICLE_FORMAT:
+                continue  # сохранено в старом формате (без таблиц или без списков в колонках) — запросим заново
             if record.get("missing"):
                 self.articles[(record["lang"], record["requested"])] = None
                 continue
@@ -100,5 +104,5 @@ class WikiCache:
                     self._append("articles.jsonl", {"lang": lang, "requested": title, "missing": True})
                 else:
                     self.articles[(lang, article.title)] = article
-                    self._append("articles.jsonl", article.to_json() | {"requested": title, "tables": True})
+                    self._append("articles.jsonl", article.to_json() | {"requested": title, "tables": ARTICLE_FORMAT})
             return self.articles[(lang, title)]

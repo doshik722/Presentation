@@ -8,7 +8,10 @@
 
 - таблица (``wikitable``, в русской Википедии и старый ``standard``) — строка «Таблица: подпись», затем строки ячеек через « | »; объединённые ячейки
   (rowspan, colspan) повторяются в каждой строке и столбце, которые они покрывают;
-- карточка (``infobox``) — «Карточка статьи:», затем строки «поле: значение»; дописывается к введению.
+- карточка (``infobox``) — «Карточка статьи:», затем строки «поле: значение»; дописывается к введению;
+- список в колонках (шаблон ``{{Кол}}`` в русской Википедии — ``div.columns``, ``{{div col}}`` в английской —
+  ``div.div-col``) — пункт на строку: простой текст выбрасывает все ``div`` вместе с содержимым, и раздел из такого
+  списка оставался пустым («Психические процессы» — «Познавательные»: ощущение, восприятие, память…).
 
 Сноски, скрытый текст и ключи сортировки выбрасываются, формулы — LaTeX в ``$…$``. Раздел таблицы — по последнему
 заголовку перед ней; заголовки HTML сопоставляются с заголовками простого текста по порядку и названию.
@@ -186,6 +189,31 @@ def _dedupe(row: list[str]) -> list[str]:
     return out
 
 
+_COLUMNS = {"columns", "div-col"}
+
+
+def list_text(block: _Node) -> str:
+    """Список в колонках простым текстом: пункт на строку (вложенные пункты — тоже отдельными строками)."""
+    lines: list[str] = []
+
+    def walk(node: _Node) -> None:
+        for child in node.children:
+            if not isinstance(child, _Node) or _hidden(child):
+                continue
+            if child.tag == "li":
+                own = _Node("li", {}, [c for c in child.children if not (isinstance(c, _Node) and c.tag in ("ul", "ol"))])
+                text = _clean(_text(own))
+                if text:
+                    lines.append(text)
+            walk(child)
+
+    walk(block)
+    if not lines:  # в колонках не список, а текст
+        text = _clean(_text(block))
+        return text
+    return "\n".join(lines)
+
+
 def table_text(table: _Node) -> str:
     """Таблица ``wikitable`` простым текстом."""
     caption = _find(table, lambda n: n.tag == "caption")
@@ -213,7 +241,7 @@ def infobox_text(table: _Node) -> str:
 @dataclass
 class HtmlTables:
     headings: list[str]  # заголовки разделов в порядке HTML
-    tables: list[tuple[int, str]]  # (сколько заголовков было до таблицы: 0 — введение, текст таблицы)
+    tables: list[tuple[int, str]]  # (сколько заголовков было до таблицы или списка в колонках: 0 — введение, текст)
 
 
 def html_tables(html: str) -> HtmlTables:
@@ -233,6 +261,10 @@ def html_tables(html: str) -> HtmlTables:
                     result.tables.append((0, text))  # карточка — всегда к введению
             elif child.tag == "table" and child.classes & {"wikitable", "standard"}:  # standard — старый стиль ruwiki
                 result.tables.append((len(result.headings), table_text(child)))
+            elif child.tag == "div" and child.classes & _COLUMNS:
+                text = list_text(child)
+                if text:
+                    result.tables.append((len(result.headings), text))
             elif child.tag != "table":
                 walk(child)
 

@@ -4,7 +4,7 @@ import urllib.parse
 
 import pytest
 
-from presentation_rl.tools.cache import CacheMiss, WikiCache
+from presentation_rl.tools.cache import ARTICLE_FORMAT, CacheMiss, WikiCache
 from presentation_rl.tools.wiki import WikiClient
 from presentation_rl.tools.wiki_tools import REPEAT_MESSAGE, WikiTools, _fit_cap
 
@@ -117,6 +117,21 @@ def test_saved_answers_are_reused_without_network(setup):
     assert offline.search("градиентный спуск") + offline.open("d1") == first
     with pytest.raises(CacheMiss):
         offline.search("что-то новое")
+
+
+def test_articles_saved_in_old_format_are_requested_again(setup):
+    # 29.10.2026 в статьи добавились списки в колонках: статьи, сохранённые раньше (tables: true), устарели
+    tools, _, folder = setup
+    tools.search("градиентный спуск")
+    tools.open("d1")
+    path = folder / "articles.jsonl"
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert all(r["tables"] == ARTICLE_FORMAT for r in records if not r.get("missing"))
+    path.write_text("".join(json.dumps(r | {"tables": True}, ensure_ascii=False) + "\n" for r in records), encoding="utf-8")
+    offline = WikiTools(WikiCache(folder))
+    offline.search("градиентный спуск")
+    with pytest.raises(CacheMiss):
+        offline.open("d1")
 
 
 def test_open_shows_intro_toc_and_leads(setup):
