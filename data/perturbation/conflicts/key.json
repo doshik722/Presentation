@@ -1,0 +1,402 @@
+[
+ {
+  "pair": "01",
+  "id": "t382/stretch_all_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "02",
+  "id": "t377/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "03",
+  "id": "t377/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "04",
+  "id": "t381/stretch_half_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "05",
+  "id": "t371/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "06",
+  "id": "t374/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "07",
+  "id": "t386/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "08",
+  "id": "t368/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "09",
+  "id": "t386/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "10",
+  "id": "t377/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "11",
+  "id": "t389/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "12",
+  "id": "t367/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "13",
+  "id": "t375/stretch_all_vs_missing2",
+  "first": "a"
+ },
+ {
+  "pair": "14",
+  "id": "t373/text_vs_keys",
+  "first": "a"
+ },
+ {
+  "pair": "15",
+  "id": "t365/stretch_all_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "16",
+  "id": "t368/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "17",
+  "id": "t381/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "18",
+  "id": "t382/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "19",
+  "id": "t384/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "20",
+  "id": "t369/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "21",
+  "id": "t380/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "22",
+  "id": "t365/stretch_all_vs_missing2",
+  "first": "a"
+ },
+ {
+  "pair": "23",
+  "id": "t389/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "24",
+  "id": "t388/text_vs_keys",
+  "first": "a"
+ },
+ {
+  "pair": "25",
+  "id": "t371/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "26",
+  "id": "t367/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "27",
+  "id": "t368/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "28",
+  "id": "t384/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "29",
+  "id": "t373/stretch_all_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "30",
+  "id": "t369/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "31",
+  "id": "t382/stretch_half_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "32",
+  "id": "t388/stretch_all_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "33",
+  "id": "t373/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "34",
+  "id": "t389/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "35",
+  "id": "t365/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "36",
+  "id": "t365/repeat_vs_missing",
+  "first": "a"
+ },
+ {
+  "pair": "37",
+  "id": "t369/stretch_all_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "38",
+  "id": "t389/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "39",
+  "id": "t373/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "40",
+  "id": "t389/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "41",
+  "id": "t380/repeat_vs_missing",
+  "first": "a"
+ },
+ {
+  "pair": "42",
+  "id": "t368/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "43",
+  "id": "t377/stretch_half_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "44",
+  "id": "t375/text_vs_keys",
+  "first": "a"
+ },
+ {
+  "pair": "45",
+  "id": "t371/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "46",
+  "id": "t386/text_vs_keys",
+  "first": "a"
+ },
+ {
+  "pair": "47",
+  "id": "t371/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "48",
+  "id": "t381/text_vs_keys",
+  "first": "a"
+ },
+ {
+  "pair": "49",
+  "id": "t375/stretch_half_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "50",
+  "id": "t374/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "51",
+  "id": "t371/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "52",
+  "id": "t377/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "53",
+  "id": "t365/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "54",
+  "id": "t380/stretch_all_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "55",
+  "id": "t367/stretch_all_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "56",
+  "id": "t369/text_vs_keys",
+  "first": "a"
+ },
+ {
+  "pair": "57",
+  "id": "t367/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "58",
+  "id": "t382/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "59",
+  "id": "t388/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "60",
+  "id": "t388/repeat_vs_missing",
+  "first": "a"
+ },
+ {
+  "pair": "61",
+  "id": "t388/stretch_half_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "62",
+  "id": "t374/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "63",
+  "id": "t382/repeat_vs_missing",
+  "first": "a"
+ },
+ {
+  "pair": "64",
+  "id": "t374/stretch_all_vs_missing2",
+  "first": "a"
+ },
+ {
+  "pair": "65",
+  "id": "t368/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "66",
+  "id": "t386/stretch_all_vs_missing2",
+  "first": "a"
+ },
+ {
+  "pair": "67",
+  "id": "t375/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "68",
+  "id": "t369/stretch_all_vs_missing2",
+  "first": "a"
+ },
+ {
+  "pair": "69",
+  "id": "t384/text_vs_keys",
+  "first": "b"
+ },
+ {
+  "pair": "70",
+  "id": "t373/stretch_all_vs_missing2",
+  "first": "b"
+ },
+ {
+  "pair": "71",
+  "id": "t380/stretch_half_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "72",
+  "id": "t384/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "73",
+  "id": "t375/repeat_vs_missing",
+  "first": "a"
+ },
+ {
+  "pair": "74",
+  "id": "t381/stretch_all_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "75",
+  "id": "t384/stretch_all_vs_missing2",
+  "first": "a"
+ },
+ {
+  "pair": "76",
+  "id": "t386/stretch_half_vs_missing1",
+  "first": "b"
+ },
+ {
+  "pair": "77",
+  "id": "t374/repeat_vs_missing",
+  "first": "a"
+ },
+ {
+  "pair": "78",
+  "id": "t367/stretch_half_vs_missing1",
+  "first": "a"
+ },
+ {
+  "pair": "79",
+  "id": "t381/repeat_vs_missing",
+  "first": "b"
+ },
+ {
+  "pair": "80",
+  "id": "t380/text_vs_keys",
+  "first": "a"
+ }
+]

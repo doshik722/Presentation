@@ -1,0 +1,62 @@
+[
+ {
+  "pair": "05",
+  "better": "1",
+  "reason": ""
+ },
+ {
+  "pair": "16",
+  "better": "1",
+  "reason": ""
+ },
+ {
+  "pair": "18",
+  "better": "равны",
+  "reason": ""
+ },
+ {
+  "pair": "40",
+  "better": "1",
+  "reason": ""
+ },
+ {
+  "pair": "44",
+  "better": "2",
+  "reason": "хотя в обеих текста мало"
+ },
+ {
+  "pair": "48",
+  "better": "2",
+  "reason": ""
+ },
+ {
+  "pair": "53",
+  "better": "равны",
+  "reason": ""
+ },
+ {
+  "pair": "56",
+  "better": "2",
+  "reason": ""
+ },
+ {
+  "pair": "57",
+  "better": "1",
+  "reason": ""
+ },
+ {
+  "pair": "62",
+  "better": "1",
+  "reason": ""
+ },
+ {
+  "pair": "69",
+  "better": "1",
+  "reason": ""
+ },
+ {
+  "pair": "80",
+  "better": "2",
+  "reason": "но текста везде мало, надо бы более подробно"
+ }
+]
