@@ -135,7 +135,8 @@ class Lemmatizer:
         if word not in self._cache:
             parsed = self.analyzer.parse(word)
             if parsed:
-                self._cache[word] = (parsed[0].normal_form.replace("ё", "е"), parsed[0].tag.POS)
+                pos = parsed[0].tag.POS  # у pymorphy3 — не строка: сравнение с «NUMB» бросает ValueError
+                self._cache[word] = (parsed[0].normal_form.replace("ё", "е"), str(pos) if pos is not None else None)
             else:
                 self._cache[word] = (word, None)
         return self._cache[word]

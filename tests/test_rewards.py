@@ -250,3 +250,36 @@ def test_quote_with_ellipsis_and_fake_quote_penalty():
     assert counted == {"QUOTE": 1} and fake == 1 and value == pytest.approx((1 - 0.25) / 2)
     _, _, _, _, _, fake = visual_score(deck, None, 1, images_allowed=True, tool_text=None)
     assert fake == 0  # без поиска цитаты ни плюс, ни минус
+
+
+class StrictPOS:
+    """Часть речи как у pymorphy3: не строка, сравнение с неизвестной граммемой бросает ValueError."""
+
+    KNOWN = {"NOUN", "PREP", "CONJ", "PRCL", "INTJ", "NPRO", "NUMR"}
+
+    def __init__(self, value):
+        self.value = value
+
+    def __eq__(self, other):
+        if other not in self.KNOWN:
+            raise ValueError(f"'{other}' is not a valid grammeme")
+        return self.value == other
+
+    def __hash__(self):
+        return hash(self.value)
+
+    def __str__(self):
+        return self.value
+
+
+class StrictAnalyzer(FakeAnalyzer):
+    def parse(self, word):
+        return [SimpleNamespace(normal_form=FORMS.get(word, word),
+                                tag=SimpleNamespace(POS=StrictPOS(FUNCTION.get(word, "NOUN"))))]
+
+
+def test_lemmatizer_works_with_non_string_parts_of_speech():
+    lemmatizer = Lemmatizer(StrictAnalyzer())
+    assert lemmatizer.lemmas("в 1957 года лед и матрица") == ["в", "1957", "лед", "и", "матрица"]
+    assert lemmatizer.content_lemmas("в 1957 года лед и матрица") == {"1957", "лед", "матрица"}
+

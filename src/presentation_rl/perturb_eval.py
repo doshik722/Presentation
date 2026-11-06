@@ -87,9 +87,10 @@ class CachedEmbedder:
 def _snapshot(name: str) -> str:
     """Коммит локальной копии модели с Hugging Face; «unknown», если узнать нельзя."""
     try:
-        from huggingface_hub import snapshot_download
+        from huggingface_hub import try_to_load_from_cache
 
-        return Path(snapshot_download(name, local_files_only=True)).name
+        path = try_to_load_from_cache(name, "config.json")  # …/snapshots/<коммит>/config.json
+        return Path(path).parent.name if isinstance(path, str) else "unknown"
     except Exception:
         return "unknown"
 
