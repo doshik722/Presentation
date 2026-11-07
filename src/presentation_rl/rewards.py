@@ -39,7 +39,7 @@
 - ``Lemmatizer(units=True)`` — «N тысяч» → число, «миллион» = «млн», «миллиард» = «млрд», «₽», «руб.» → «рубль»,
   «%», «процентный» → «процент»;
 - ``RewardWeights.contradiction`` — штраф за ключ, у которого связки «число + единица» на его слайдах нет, а та же
-  единица стоит с другим числом;
+  единица стоит с другим числом, которого нет в ключах темы;
 - ``RewardWeights.direct_penalties`` — переполнение слайда, ошибка отрисовки, формула сверх предела и выдуманная цитата —
   прямые штрафы, а не доли визуальной суммы;
 - ``RewardWeights.visual_tau`` — визуал засчитывается, только если его текст близок к тексту слайда (порог τ по виду
@@ -232,10 +232,12 @@ def number_units(tokens: Sequence[tuple[str, str | None]]) -> set[tuple[str, str
             if tokens[i][1] == "NUMB" and tokens[i + 1][1] in ("NOUN", None)}
 
 
-def contradicts(key_pairs: set[tuple[str, str]], slide_pairs: set[tuple[str, str]]) -> bool:
-    """Верной связки нет, а та же единица стоит с другим числом."""
+def contradicts(key_pairs: set[tuple[str, str]], slide_pairs: set[tuple[str, str]],
+                allowed: set[tuple[str, str]] = frozenset()) -> bool:
+    """Верной связки нет, а та же единица стоит с другим числом. ``allowed`` — связки из ключей всей темы:
+    такое число — другая величина той же темы («план 12 млн» рядом с ключом «1,2 млн»), не противоречие."""
     return any((number, unit) not in slide_pairs
-               and any(u == unit and n != number for n, u in slide_pairs)
+               and any(u == unit and n != number and (n, u) not in allowed for n, u in slide_pairs)
                for number, unit in key_pairs)
 
 
@@ -646,6 +648,7 @@ def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_ran
         slide_tokens = [lemmatizer.tokens(t.full) for t in texts]
         slide_lemmas = [[lemma for lemma, _ in tokens] for tokens in slide_tokens]
         slide_pairs = [number_units(tokens) for tokens in slide_tokens]
+        topic_pairs = set().union(*(number_units(lemmatizer.tokens(k)) for p in points for k in p.key))
         # последний слайд — заключение: в выбор лучшего для содержательных тезисов не входит
         pool = list(range(n - 1)) if has_conclusion and n > 1 else list(range(n))
         for i, point in enumerate(points):
@@ -666,7 +669,7 @@ def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_ran
                 key_tokens = lemmatizer.tokens(key)
                 needle = [lemma for lemma, _ in key_tokens]
                 (found if any(contains(slide_lemmas[j], needle) for j in counted_slides) else missing).append(key)
-                contradictions += contradicts(number_units(key_tokens), pairs_here)
+                contradictions += contradicts(number_units(key_tokens), pairs_here, topic_pairs)
             theses.append(ThesisResult(best + 1, float(sim[i, best]), [j + 1 for j in key_slides], found, missing,
                                        b, contradictions))
     else:

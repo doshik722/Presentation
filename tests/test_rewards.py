@@ -321,6 +321,9 @@ def test_numeric_contradiction_is_penalized_once_per_key():
     assert bad.contradictions == 1  # голый год так не проверяется
     assert bad.total == pytest.approx(score(wrong, [point], **kwargs).total - 0.05)
     assert score(right, [point], weights=on, **kwargs).contradictions == 0
+    # другое число той же единицы, которое само есть ключ темы, — другая величина, не противоречие
+    other = KeyPoint("Рост", "рост за год", ["9,5%"])
+    assert score(wrong, [point, other], weights=on, **kwargs).contradictions == 0
 
 
 def _gate_case():
