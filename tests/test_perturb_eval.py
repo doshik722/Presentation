@@ -2,8 +2,10 @@
 import json
 
 from presentation_rl.perturb import generate
-from presentation_rl.perturb_eval import (Config, Item, Rules, author_answers, build_all, check_pairs, choose,
-                                          conflict_rows, edge, evaluate_pairs, family_shares, load_conflicts, nested_cv,
+from presentation_rl.dsl import parse
+from presentation_rl.perturb_eval import (VARIANTS, Config, Item, Rules, ablation_configs, ablation_rows, author_answers,
+                                          build_all, calibrate_tau, check_pairs, choose, conflict_rows, edge,
+                                          evaluate_pairs, family_shares, load_conflicts, load_foreign, nested_cv,
                                           score_items, signed, stratified_folds, tally, verdict)
 from presentation_rl.rewards import Lemmatizer
 
@@ -104,3 +106,46 @@ def test_folds_are_balanced_by_mode_and_cv_reports_stability():
     report = nested_cv(tallies, None, modes)
     assert report["final"] == configs[1].name and report["stable"] and report["reliable"]
     assert edge(configs[2], configs) == {"alpha": 0.6} and edge(configs[1], configs) == {}
+
+
+def test_ablation_variants_score_end_to_end(tmp_path):
+    configs = ablation_configs("fake", 0.2, [0.5, 1.0], [0.5, 1.0])
+    assert [c.variant for c in configs[:len(VARIANTS)]] == list(VARIANTS)
+    assert len(configs) == len(VARIANTS) + 3 and Config("fake", 0.2, 1.0, 0.5).name == "fake|a=0.2|len=1.0|keys=0.5"
+    assert configs[-1].name.endswith("|all") and configs[0].weights() == Config("fake", 0.2, 1.0, 0.5).weights()
+    (tmp_path / "sft.jsonl").write_text("\n".join(json.dumps({"answer": ORIGINAL}) for _ in range(2)), encoding="utf-8")
+    foreign = load_foreign(tmp_path / "sft.jsonl")
+    assert len(foreign) == 2 and foreign[0]
+    result = generate("t1", ORIGINAL, ANNOTATION, POINTS, CONTEXT, DONOR)
+    items = {("t1", vid): Item(("t1", vid), "t1", v["text"], {**CONTEXT, **v["context"]})
+             for vid, v in result.variants.items()}
+    pairs = [{**p.__dict__, "task": "t1", "mode": "search"} for p in result.pairs]
+    build_all(items, log=lambda _: None)
+    pairs, _ = check_pairs(pairs, items)
+    lemmatizer, embedder = Lemmatizer(FakeAnalyzer()), FakeEmbedder()
+    tau = {"IMAGE": 0.0}
+    scores = {c: score_items(items, {"t1": POINTS}, c, embedder, lemmatizer, foreign, tau) for c in configs}
+    base = configs[0]
+    assert scores[configs[1]][("t1", "original")]["coverage"] < scores[base][("t1", "original")]["coverage"]  # фон — сам исходник
+    assert "contradictions" in scores[base][("t1", "original")]
+    rows = ablation_rows(pairs, scores, {c: 0.01 for c in configs}, base)
+    assert {r["variant"] for r in rows} == set(VARIANTS)
+    try:
+        score_items(items, {"t1": POINTS}, configs[1], embedder, lemmatizer)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("без фона вариант relative должен падать")
+
+
+def test_tau_is_calibrated_on_own_slides_against_foreign_visuals():
+    def deck(word, n):
+        return parse("\n".join(f"#SLIDE\n#TITLE: Слайд\n#TEXT: {word}{i} текст\n#IMAGE: {word}{i} фото" for i in range(n)))
+
+    decks = {"a": deck("альфа", 10), "b": deck("бета", 10), "c": deck("гамма", 10)}
+    domains = {"a": "x", "b": "x", "c": "y"}
+    tau, report = calibrate_tau(decks, domains, FakeEmbedder(), minimum=15)
+    row = next(r for r in report if r["kind"] == "IMAGE")
+    assert row["positives"] == 30 and row["negatives"] == 2 * 10 * 10  # a↔b, у c своей темы того же типа нет
+    assert row["positives_pass"] >= 0.95 and row["negatives_filtered"] == 1.0 and tau == {"IMAGE": row["tau"]}
+    assert not next(r for r in report if r["kind"] == "DIAGRAM")["verified"]

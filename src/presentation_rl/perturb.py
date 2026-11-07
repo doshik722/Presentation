@@ -11,7 +11,8 @@
 ``down`` — Δ ≤ −m; ``not_up`` — Δ ≤ ε; ``same`` — |Δ| ≤ ε; m и ε считает оценка. ``checks`` — предусловия,
 которые проверяет оценка по отчёту сборщика до подсчёта награды (дефект действительно получился).
 
-Запуск: ``python -m presentation_rl.perturb`` из корня репозитория.
+Запуск: ``python -m presentation_rl.perturb`` из корня репозитория; новые исходники для независимой проверки
+(решение 07.11.2026) — ``--base data/perturbation/holdout``.
 """
 from __future__ import annotations
 
@@ -221,7 +222,8 @@ class _Builder:
         self.conclusion_point = context["conclusion"] and len(points) > 1
         self.has_conclusion_slide = self.n > 2 and bool(_CONCLUSION_RE.match(original.title(self.n)))
         last_content = self.n - 1 if self.has_conclusion_slide else self.n
-        self.content = list(range(2, last_content + 1))
+        # первый слайд — титульный; в презентации из одного слайда он же содержательный («один слайд» в запросе)
+        self.content = list(range(2, last_content + 1)) or [1]
         # N в награде — по числу слайдов и требованию заключения (rewards.score)
         self.N = max(1, self.n - 1 - (1 if self.conclusion_point and self.n > 2 else 0)) if self.n > 1 else 1
 
@@ -269,7 +271,7 @@ class _Builder:
     def donor_textual(self) -> tuple[str, list[str]]:
         """Заголовок и текст содержательного слайда чужой темы (средний)."""
         n = len(self.donor)
-        number = max(2, n // 2)
+        number = min(max(2, n // 2), n)  # донор из одного слайда — сам этот слайд
         lines = [l for l in self.donor.slide(number) if line_tag(l)[0] in TEXTUAL]
         return self.donor.title(number), lines
 
@@ -859,17 +861,19 @@ def export_blind(conflicts: list[dict], requests: dict[str, str], sources: dict[
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--root", default=".", help="корень репозитория")
-    parser.add_argument("--out", default="data/perturbation/variants")
+    parser.add_argument("--base", default="data/perturbation",
+                        help="папка набора: annotations.json и originals/ (data/perturbation/holdout — новые исходники)")
+    parser.add_argument("--out", default=None, help="куда писать варианты (по умолчанию <base>/variants)")
     parser.add_argument("--blind", default=None,
                         help="папка для слепого судьи (вне репозитория): пары с конфликтом достоинств")
     args = parser.parse_args(argv)
     root = Path(args.root)
-    base = root / "data" / "perturbation"
+    base = root / args.base
     annotations = json.loads((base / "annotations.json").read_text(encoding="utf-8"))
     points = load_key_points(root / "data" / "tasks" / "key_points" / "key_points.json")
     tasks = {t.id: t for t in load_tasks(root / "data" / "tasks" / "tasks.json")}
     ids = sorted(annotations)
-    out = root / args.out
+    out = root / args.out if args.out else base / "variants"
     out.mkdir(parents=True, exist_ok=True)
     total, skipped, conflicts, requests, sources = 0, [], [], {}, {}
     for k, task_id in enumerate(ids):

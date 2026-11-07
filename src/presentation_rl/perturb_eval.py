@@ -5,6 +5,10 @@
 по сетке конфигураций, естественный разброс награды по 8 ответам T-lite (σ, пороги m = 0,25·σ и ε = 0,1·σ),
 вердикты по парам, сводка по семействам и режимам, вложенная перекрёстная проверка по темам и бутстреп по темам.
 
+Второй прогон (решение 07.11.2026): варианты награды ``VARIANTS`` (исходная, каждое изменение по отдельности
+и все вместе), фон тезисов по чужим презентациям (``load_foreign``) и пороги связи визуала со слайдом
+(``calibrate_tau``); сводка абляций — ``ablation_rows``.
+
 Знак компонентов — «как входит в награду»: у штрафов обратный, Δ < 0 всегда значит «хуже».
 """
 from __future__ import annotations
@@ -26,10 +30,12 @@ from .dsl import parse
 from .key_points import KeyPoint
 from .perturb import task_context
 from .rendering.builder import build_presentation
-from .rewards import RewardWeights, score
+from .rewards import (CHECKED_VISUALS, Lemmatizer, RewardWeights, SlideText, pairwise_cosine, score, slide_body,
+                      slide_texts, thesis_backgrounds, visual_text)
 
 PENALTIES = frozenset({"length", "forbidden_images", "slide_overflow", "render_errors", "fake_quotes", "bad_sources",
-                       "format", "text_overflow", "tools", "repeats"})
+                       "format", "text_overflow", "tools", "repeats", "contradictions", "formula_over",
+                       "unrelated_visuals"})
 M_SHARE, EPS_SHARE, SIGMA_FLOOR = 0.25, 0.1, 0.005
 
 
@@ -254,19 +260,44 @@ def check_pairs(pairs: list[dict], items: dict[tuple, Item]) -> tuple[list[dict]
 
 # --------------------------------------------------------------------------- награда по сетке
 
+# варианты награды для абляций (решение 07.11.2026); visual_tau=True — подставить откалиброванные пороги
+VARIANTS: dict[str, dict] = {
+    "base": {},
+    "relative": {"relative": True},
+    "keys_gate": {"keys_gate": True},
+    "units": {},  # только лемматизатор с числами и единицами
+    "contradiction": {"contradiction": 0.05},
+    "direct": {"direct_penalties": True},
+    "visual_link": {"visual_tau": True},
+    "all": {"relative": True, "keys_gate": True, "contradiction": 0.05, "direct_penalties": True, "visual_tau": True},
+}
+UNITS_VARIANTS = frozenset({"units", "all"})
+
+
 @dataclass(frozen=True)
 class Config:
     embedder: str
     alpha: float
     length: float
     keys: float  # вес ключей при весе покрытия 1
+    variant: str = "base"  # вариант награды (VARIANTS)
 
-    def weights(self, base: RewardWeights | None = None) -> RewardWeights:
-        return replace(base or RewardWeights(), alpha=self.alpha, length=self.length, keys=self.keys)
+    def weights(self, base: RewardWeights | None = None, tau: dict[str, float] | None = None) -> RewardWeights:
+        overrides = dict(VARIANTS[self.variant])
+        if overrides.pop("visual_tau", False):
+            if tau is None:
+                raise ValueError(f"{self.variant}: нужны пороги связи визуала со слайдом (calibrate_tau)")
+            overrides["visual_tau"] = dict(tau)
+        return replace(base or RewardWeights(), alpha=self.alpha, length=self.length, keys=self.keys, **overrides)
+
+    @property
+    def units(self) -> bool:
+        return self.variant in UNITS_VARIANTS
 
     @property
     def name(self) -> str:
-        return f"{self.embedder.split('/')[-1]}|a={self.alpha}|len={self.length}|keys={self.keys}"
+        name = f"{self.embedder.split('/')[-1]}|a={self.alpha}|len={self.length}|keys={self.keys}"
+        return name if self.variant == "base" else f"{name}|{self.variant}"
 
 
 def grid(embedders: Sequence[str], alphas: Sequence[float], lengths: Sequence[float],
@@ -274,19 +305,127 @@ def grid(embedders: Sequence[str], alphas: Sequence[float], lengths: Sequence[fl
     return [Config(e, a, l, k) for e, a, l, k in itertools.product(embedders, alphas, lengths, keys)]
 
 
+def ablation_configs(embedder: str, alpha: float, lengths: Sequence[float], keys: Sequence[float]) -> list[Config]:
+    """Каждый вариант при текущих λ и весе ключей; для полного варианта — ещё сетка λ × вес ключей."""
+    configs = [Config(embedder, alpha, *CURRENT_WEIGHTS, variant) for variant in VARIANTS]
+    configs += [Config(embedder, alpha, l, k, "all") for l, k in itertools.product(lengths, keys)
+                if (l, k) != CURRENT_WEIGHTS]
+    return configs
+
+
+def _units_twin(lemmatizer: Lemmatizer) -> Lemmatizer:
+    """Лемматизатор с числами и единицами на том же анализаторе (один на исходный, со своим кешем)."""
+    if getattr(lemmatizer, "_units_twin", None) is None:
+        lemmatizer._units_twin = Lemmatizer(lemmatizer.analyzer, units=True)
+    return lemmatizer._units_twin
+
+
 def score_items(items: dict[tuple, Item], points: dict[str, list[KeyPoint]], config: Config, embedder,
-                lemmatizer) -> dict[tuple, dict[str, float]]:
-    """Компоненты награды (со знаком «как в награде») для каждой презентации при конфигурации ``config``."""
-    weights = config.weights()
+                lemmatizer, foreign: Sequence[Sequence[SlideText]] | None = None,
+                tau: dict[str, float] | None = None) -> dict[tuple, dict[str, float]]:
+    """Компоненты награды (со знаком «как в награде») для каждой презентации при конфигурации ``config``.
+    ``foreign`` — чужие презентации для фона тезисов (нужны вариантам с ``relative``/``keys_gate``),
+    ``tau`` — пороги связи визуала со слайдом (вариантам с ``visual_tau``)."""
+    weights = config.weights(tau=tau)
+    lemmatizer = _units_twin(lemmatizer) if config.units else lemmatizer
+    need_background = weights.relative or weights.keys_gate
+    if need_background and not foreign:
+        raise ValueError(f"{config.name}: нужен фон — чужие презентации (load_foreign)")
+    backgrounds: dict[tuple, list[float]] = {}
     result = {}
     for key, item in items.items():
         c = item.context
         slide_range = tuple(c["slide_range"]) if c.get("slide_range") else None
+        background = None
+        if need_background:
+            memo = (item.task, c["conclusion"])
+            if memo not in backgrounds:
+                backgrounds[memo] = thesis_backgrounds(points[item.task], foreign, embedder, lemmatizer, weights,
+                                                       conclusion=c["conclusion"])
+            background = backgrounds[memo]
         r = score(item.deck, points[item.task], conclusion=c["conclusion"], slide_range=slide_range,
                   embedder=embedder, lemmatizer=lemmatizer, report=item.report, images_allowed=c["images_allowed"],
-                  tool_text=c.get("tool_text"), calls=c.get("calls"), search=c["search"], weights=weights)
+                  tool_text=c.get("tool_text"), calls=c.get("calls"), search=c["search"], weights=weights,
+                  backgrounds=background)
         result[key] = signed(r.components())
     return result
+
+
+# --------------------------------------------------------------------------- фон и пороги визуала (07.11.2026)
+
+def load_foreign(path: str | Path) -> list[list[SlideText]]:
+    """Чужие презентации для фона тезисов: ответы примеров SFT без поиска (их темы не входят в RL)."""
+    result = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            result.append(slide_texts(parse(json.loads(line)["answer"])))
+    return result
+
+
+def calibrate_tau(decks: dict[str, object], domains: dict[str, str], embedder, share: float = 0.95,
+                  minimum: int = 15) -> tuple[dict[str, float], list[dict]]:
+    """Пороги связи визуала со слайдом по видам (решение 07.11.2026).
+
+    Положительные — визуал исходника и текст его слайда (``slide_body``); отрицательные — визуал того же вида
+    из исходников других тем того же типа (``domains``) и текст этого же слайда. τ — наибольший порог, при котором
+    проходит не меньше ``share`` положительных. Вид без порога (идёт за половину бонуса), если положительных или
+    отрицательных меньше ``minimum`` или отрицательных отсеивается меньше половины."""
+    visuals: dict[str, list[tuple[str, str]]] = {}  # тема → (вид, текст визуала)
+    slides: list[tuple[str, str, str, str]] = []  # тема, вид, текст визуала, текст слайда
+    for task, deck in decks.items():
+        visuals[task] = []
+        for slide in deck.slides:
+            body = slide_body(slide, set())
+            for element in slide.elements:
+                if element.kind in CHECKED_VISUALS:
+                    text = visual_text(element)
+                    visuals[task].append((element.kind, text))
+                    slides.append((task, element.kind, text, body))
+    pairs: list[tuple[str, bool, str, str]] = []  # вид, положительный, текст визуала, текст слайда
+    for task, kind, text, body in slides:
+        pairs.append((kind, True, text, body))
+        for other, items in visuals.items():
+            if other != task and domains.get(other) == domains.get(task):
+                pairs += [(kind, False, t, body) for k, t in items if k == kind]
+    sims = pairwise_cosine(embedder, [p[2] for p in pairs], [p[3] for p in pairs]) if pairs else []
+    tau, report = {}, []
+    for kind in sorted(CHECKED_VISUALS):
+        pos = sorted(float(v) for p, v in zip(pairs, sims) if p[0] == kind and p[1])
+        neg = [float(v) for p, v in zip(pairs, sims) if p[0] == kind and not p[1]]
+        row = {"kind": kind, "positives": len(pos), "negatives": len(neg), "tau": None, "negatives_filtered": None}
+        if pos:
+            value = pos[int(math.floor((1 - share) * len(pos) + 1e-9))]
+            row["tau"] = value
+            row["positives_pass"] = sum(v >= value for v in pos) / len(pos)
+            if neg:
+                row["negatives_filtered"] = sum(v < value for v in neg) / len(neg)
+        row["verified"] = bool(len(pos) >= minimum and len(neg) >= minimum
+                               and row["negatives_filtered"] is not None and row["negatives_filtered"] >= 0.5)
+        if row["verified"]:
+            tau[kind] = row["tau"]
+        report.append(row)
+    return tau, report
+
+
+def ablation_rows(pairs: list[dict], scores: dict[Config, dict], sigmas: dict[Config, float],
+                  base: Config) -> list[dict]:
+    """Сводка абляций по видам искажений: медиана Δ награды в абсолютных числах, в σ своей и в σ исходной награды;
+    доля выполненных ожиданий по своим порогам и по старому критерию (пороги от σ исходной награды)."""
+    out = []
+    for config, s in scores.items():
+        own = summarize(evaluate_pairs(pairs, s, M_SHARE * sigmas[config], EPS_SHARE * sigmas[config]))
+        old = {(e["family"], e["kind"], e["mode"]): e
+               for e in summarize(evaluate_pairs(pairs, s, M_SHARE * sigmas[base], EPS_SHARE * sigmas[base]))}
+        for e in own:
+            o = old[(e["family"], e["kind"], e["mode"])]
+            out.append({"config": config.name, "variant": config.variant, "family": e["family"], "kind": e["kind"],
+                        "mode": e["mode"], "n": e["n"], "d_total_median": e["d_total_median"],
+                        "d_sigma_own": e["d_total_median"] / sigmas[config],
+                        "d_sigma_base": e["d_total_median"] / sigmas[base], "sigma": sigmas[config],
+                        "total_ok": e["total_ok"], "total_violation": e["total_violation"],
+                        "total_ok_base_criterion": o["total_ok"], "total_violation_base_criterion": o["total_violation"],
+                        "component_ok": e["component_ok"]})
+    return out
 
 
 def sigma(scores: dict[tuple, dict[str, float]]) -> tuple[float, list[dict]]:
@@ -465,6 +604,8 @@ def _neighbors(config: Config, configs: Sequence[Config]) -> list[Config]:
     axes = {f: sorted({getattr(c, f) for c in configs}) for f in ("embedder", "alpha", "length", "keys")}
     out = []
     for c in configs:
+        if c.variant != config.variant:  # варианты награды — не ось сетки
+            continue
         diff = [f for f in axes if getattr(c, f) != getattr(config, f)]
         if len(diff) == 1 and diff[0] != "embedder":
             values = axes[diff[0]]
@@ -530,7 +671,7 @@ def choose(tallies: dict[Config, dict], conflicts: dict[Config, dict] | None, bl
     chosen = max(close, key=lambda c: (stability(c), crit[c]))
     info.update(best=best.name, close=[c.name for c in close], halfwidth=half)
     if conflicts is not None and (chosen.length, chosen.keys) != CURRENT_WEIGHTS:
-        base = Config(chosen.embedder, chosen.alpha, *CURRENT_WEIGHTS)
+        base = Config(chosen.embedder, chosen.alpha, *CURRENT_WEIGHTS, chosen.variant)
         if base in score:
             rng = random.Random(rules.seed + 1)
             diffs = []
@@ -622,8 +763,9 @@ def identifiable(conflict_by: dict[Config, list[dict]]) -> list[dict]:
     и α (1 — параметры по этим парам не выбрать)."""
     groups: dict[tuple, set] = {}
     for config, rows in conflict_by.items():
-        groups.setdefault((config.embedder, config.alpha), set()).add(tuple(r["reward"] for r in rows))
-    return [{"embedder": e, "alpha": a, "distinct_rankings": len(v)} for (e, a), v in sorted(groups.items())]
+        groups.setdefault((config.embedder, config.alpha, config.variant), set()).add(tuple(r["reward"] for r in rows))
+    return [{"embedder": e, "alpha": a, "variant": v, "distinct_rankings": len(r)}
+            for (e, a, v), r in sorted(groups.items())]
 
 
 EXTENSION = {"alpha": {0.4: 0.6}, "length": {0.5: 0.25, 2.0: 4.0}, "keys": {0.5: 0.25, 1.0: 1.5}}

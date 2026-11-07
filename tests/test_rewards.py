@@ -9,7 +9,8 @@ from presentation_rl.dsl import parse
 from presentation_rl.key_points import KeyPoint
 from presentation_rl.rendering.builder import ElementReport, RenderReport
 from presentation_rl.rewards import (Lemmatizer, RewardWeights, expected_slides, length_penalty, lexical_share, score,
-                                     slide_texts, tool_penalty, visual_score)
+                                     similarity_matrix, slide_texts, thesis_backgrounds, tool_penalty, visual_details,
+                                     visual_score)
 
 FORMS = {"льда": "лед", "лед": "лед", "фототока": "фототок", "фототок": "фототок", "года": "год", "г": "г",
          "матрицы": "матрица", "матрица": "матрица", "градиентного": "градиентный", "градиентный": "градиентный",
@@ -283,3 +284,105 @@ def test_lemmatizer_works_with_non_string_parts_of_speech():
     assert lemmatizer.lemmas("в 1957 года лед и матрица") == ["в", "1957", "лед", "и", "матрица"]
     assert lemmatizer.content_lemmas("в 1957 года лед и матрица") == {"1957", "лед", "матрица"}
 
+
+
+# --------------------------------------------------------------------------- кандидаты 07.11.2026
+
+UNIT_FORMS = {"тысяч": "тысяча", "миллиона": "миллион", "рублей": "рубль", "процентным": "процентный",
+              "составила": "составить", "году": "год"}
+
+
+class UnitAnalyzer(FakeAnalyzer):
+    def parse(self, word):
+        if word in UNIT_FORMS:
+            return [SimpleNamespace(normal_form=UNIT_FORMS[word], tag=SimpleNamespace(POS="NOUN"))]
+        return super().parse(word)
+
+
+ULEM = Lemmatizer(UnitAnalyzer(), units=True)
+
+
+def test_units_numbers_and_currencies():
+    assert ULEM.lemmas("10 тысяч рублей") == ["10000", "рубль"]
+    assert ULEM.lemmas("3,4 тыс. руб.") == ["3400", "рубль"]
+    assert ULEM.lemmas("8,5% и 4-процентным") == ["8.5", "процент", "и", "4", "процент"]
+    assert ULEM.lemmas("2 миллиона ₽") == ["2", "млн", "рубль"]
+    assert ULEM.lemmas("10 000 рублей") == ULEM.lemmas("10 тысяч рублей")
+    assert Lemmatizer(UnitAnalyzer()).lemmas("8,5% и 10 тысяч") == ["8.5", "и", "10", "тысяча"]  # прежнее поведение
+
+
+def test_numeric_contradiction_is_penalized_once_per_key():
+    point = KeyPoint("Инфляция", "инфляция за год", ["8,5%", "1957"])
+    wrong = deck_of(["#TITLE: Инфляция", "#TEXT: инфляция составила 9,5% в 1958 году"])
+    right = deck_of(["#TITLE: Инфляция", "#TEXT: инфляция составила 8,5% в 1958 году"])
+    kwargs = dict(conclusion=False, slide_range=None, embedder=EMB, lemmatizer=ULEM)
+    on = RewardWeights(contradiction=0.05)
+    bad = score(wrong, [point], weights=on, **kwargs)
+    assert bad.contradictions == 1  # голый год так не проверяется
+    assert bad.total == pytest.approx(score(wrong, [point], **kwargs).total - 0.05)
+    assert score(right, [point], weights=on, **kwargs).contradictions == 0
+
+
+def _gate_case():
+    deck = deck_of(["#TITLE: Альфа", "#TEXT: альфа бета ключик"], ["#TITLE: Прочее", "#TEXT: альфа дельта"])
+    point = KeyPoint("Альфа", "альфа бета", ["ключик", "дельта"])
+    sim = similarity_matrix([point], slide_texts(deck), EMB, LEM, RewardWeights())
+    return deck, point, sim
+
+
+def test_relative_coverage_and_keys_gate():
+    deck, point, sim = _gate_case()
+    assert sim[0, 0] > sim[0, 1] > 0
+    b = float(sim[0, 1] + sim[0, 0]) / 2  # фон между двумя слайдами
+    kwargs = dict(conclusion=False, slide_range=None, embedder=EMB, lemmatizer=LEM, backgrounds=[b])
+    plain = score(deck, [point], **kwargs)
+    assert plain.keys == 1.0
+    gated = score(deck, [point], weights=RewardWeights(keys_gate=True), **kwargs)
+    assert gated.theses[0].found_keys == ["ключик"] and gated.theses[0].missing_keys == ["дельта"]
+    relative = score(deck, [point], weights=RewardWeights(relative=True), **kwargs)
+    assert relative.coverage == pytest.approx((sim[0, 0] - b) / (1 - b))
+    low = score(deck, [point], weights=RewardWeights(relative=True), **{**kwargs, "backgrounds": [0.99]})
+    assert low.coverage < 0  # без отсечения нулём
+    with pytest.raises(ValueError):
+        score(deck, [point], weights=RewardWeights(relative=True), conclusion=False, slide_range=None,
+              embedder=EMB, lemmatizer=LEM)
+
+
+def test_thesis_backgrounds_mean_of_best_and_last_slide_for_conclusion():
+    points = [KeyPoint("Альфа", "альфа бета", ["альфа"]), KeyPoint("Вывод", "итог альфа", ["итог"])]
+    first = slide_texts(deck_of(["#TITLE: Альфа", "#TEXT: альфа"], ["#TITLE: Итог", "#TEXT: итог альфа бета"]))
+    second = slide_texts(deck_of(["#TITLE: Прочее", "#TEXT: бета"], ["#TITLE: Конец", "#TEXT: конец"]))
+    weights = RewardWeights()
+    result = thesis_backgrounds(points, [first, second], EMB, LEM, weights, conclusion=True)
+    s1 = similarity_matrix(points, first, EMB, LEM, weights)
+    s2 = similarity_matrix(points, second, EMB, LEM, weights)
+    assert result[0] == pytest.approx((s1[0, 0] + s2[0, 0]) / 2)  # последний слайд — не для содержательных
+    assert result[1] == pytest.approx((s1[1, 1] + s2[1, 1]) / 2)  # заключение — только с последним
+
+
+def test_direct_penalties_replace_visual_sum():
+    deck = deck_of(["#TITLE: Тема"], ["#TITLE: Сила", "#TEXT: знание", "#QUOTE: «Знание — сила» — Бэкон",
+                                      "#FORMULA: a", "#FORMULA: b", "#FORMULA: c"], ["#TITLE: Итог"])
+    old = visual_details(deck, None, 1, True, "другое")
+    new = visual_details(deck, None, 1, True, "другое", direct=True)
+    assert (old.fake_quotes, old.formula_over) == (1, 1) == (new.fake_quotes, new.formula_over)
+    assert new.value == pytest.approx(2 * 0.7 / 2)
+    assert old.value == pytest.approx((2 * 0.7 - 0.2 - 0.25) / 2)
+    kwargs = dict(conclusion=False, slide_range=None, embedder=EMB, lemmatizer=LEM, tool_text="другое")
+    w = RewardWeights(direct_penalties=True)
+    direct = score(deck, [KeyPoint("Сила", "знание", [])], weights=w, **kwargs)
+    before = score(deck, [KeyPoint("Сила", "знание", [])], **kwargs)
+    assert direct.visual > before.visual
+    assert (direct.fake_quotes, direct.formula_over) == (1, 0)  # N = 2: формул до 4
+    assert direct.total - before.total == pytest.approx(w.visual * (direct.visual - before.visual) - 0.1)
+
+
+def test_visual_relevance_threshold_duplicates_and_unverified_kinds():
+    deck = deck_of(["#TITLE: Кот", "#TEXT: кот и собака", "#IMAGE: кот спит", "#IMAGE: кот спит"],
+                   ["#TITLE: Мотор", "#TEXT: кот и собака", "#IMAGE: двигатель",
+                    "#DIAGRAM: type=flow; узел альфа -> узел бета"])
+    result = visual_details(deck, None, 2, True, None, embedder=EMB, tau={"IMAGE": 0.3})
+    assert result.duplicates == 1 and result.unrelated == 1
+    assert result.counted == {"IMAGE": 1, "DIAGRAM": 1}
+    assert result.value == pytest.approx((1 + 0.5) / 4)  # у схемы нет порога — половина бонуса
+    assert visual_details(deck, None, 2, True, None).counted == {"IMAGE": 3, "DIAGRAM": 1}  # прежнее поведение
