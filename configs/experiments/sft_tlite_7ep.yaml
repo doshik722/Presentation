@@ -1,0 +1,12 @@
+# Здесь задаём SFT-разогрев T-lite с LoRA, 7 эпох: после 3 эпох loss на обучении ещё падал, разрыв с отложенными темами мал (EXP-015).
+model_id: t-tech/T-lite-it-2.1
+revision: main
+lora_rank: 32
+lora_alpha: 32
+learning_rate: 0.0002
+epochs: 7
+grad_accum: 8
+warmup_ratio: 0.03
+eval_tasks: 9
+seed: 0
+max_tokens: 16000
