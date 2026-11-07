@@ -30,8 +30,9 @@
 ``#TIMELINE`` и ``#CHART``. Не идут ``#NOTES``, ``#IMAGE``, ``#SOURCE``, ``#PLAN``, ``#FORMULA`` и элементы, которые
 сборщик не нарисовал (``overflow``, ``render_error``). Текст с ``text_overflow`` нарисован и считается видимым.
 
-Кандидаты по итогам проверки на искажениях (решение 07.11.2026, EXP-014); каждый включается отдельно, по умолчанию
-выключены (награда прежняя):
+Изменения по итогам проверки на искажениях (решения 07.11.2026, EXP-014 и EXP-016). Каждое включается отдельно;
+по умолчанию включены принятые — прямые штрафы, связь визуала со слайдом (пороги ``VISUAL_TAU``), числа и единицы
+в лемматизаторе; остальные выключены (не подтвердились, оставлены для воспроизведения абляций):
 
 - ``RewardWeights.relative`` — покрытие тезиса относительно фона: ``(sim − b)/(1 − b)`` без отсечения нулём; фон b —
   ``thesis_backgrounds`` по чужим презентациям, передаётся в ``score(backgrounds=...)``;
@@ -43,7 +44,8 @@
 - ``RewardWeights.direct_penalties`` — переполнение слайда, ошибка отрисовки, формула сверх предела и выдуманная цитата —
   прямые штрафы, а не доли визуальной суммы;
 - ``RewardWeights.visual_tau`` — визуал засчитывается, только если его текст близок к тексту слайда (порог τ по виду
-  визуала; вид без порога — за ``visual_unverified`` бонуса); одинаковые элементы засчитываются один раз.
+  визуала; вид без порога — за ``visual_unverified`` бонуса); одинаковый элемент (вид и текст) засчитывается один раз,
+  повтор — как элемент сверх предела (−1 в сумме; формула — как формула сверх предела).
 
 Эмбеддер и лемматизатор подставляются: в обучении — ``SentenceEmbedder`` и ``Lemmatizer`` (pymorphy3), в тестах —
 простые заменители. Веса — временные, подбираются на испорченных презентациях.
@@ -66,6 +68,9 @@ FAKE_QUOTE_PENALTY = 0.25  # цитата, которой нет в выдаче
 RENDER_ERROR_VALUE = 0.5  # во сколько раз штраф за неотрисованный элемент меньше штрафа за излишек
 COUNTED_STATUSES = frozenset({"ok", "placeholder"})
 CHECKED_VISUALS = frozenset({"CHART", "PLOT", "DIAGRAM", "TIMELINE", "IMAGE"})  # связь со слайдом проверяется
+# пороги связи визуала со слайдом: bge-m3, 16 исходников (EXP-016, perturb_eval.calibrate_tau); у графиков, хронологий
+# и графиков функций мало примеров — без порога, за половину бонуса. Для другого эмбеддера — откалибровать заново.
+VISUAL_TAU = {"IMAGE": 0.411, "DIAGRAM": 0.522}
 ERROR_STATUSES = frozenset({"render_error", "undefined_plot"})  # −0,5; flat_plot — ни плюса, ни минуса  # placeholder — картинка, которую при обучении не скачивают
 LENGTH_FACTOR = 1.3  # содержательных слайдов на тезис, если число слайдов не задано
 VISUAL_TYPE_SHARE = 0.5  # предел на тип: ⌈0,5·N⌉
@@ -164,10 +169,10 @@ class Lemmatizer:
     """Слова в начальной форме; числа — как есть («6 400» → «6400», «3,4» → «3.4»), «г.» и «год» после числа
     убираются, ё → е. ``analyzer`` — объект с ``parse(word) → [разбор с normal_form и tag.POS]`` (pymorphy3).
 
-    ``units`` — числа и единицы (кандидат 07.11.2026): «N тысяч» → N·1000, «миллион» → «млн», «миллиард» → «млрд»,
+    ``units`` — числа и единицы (решение 07.11.2026; False — прежнее поведение): «N тысяч» → N·1000, «миллион» → «млн», «миллиард» → «млрд»,
     «₽», «руб.» → «рубль», «%», «процентный» → «процент» («4-процентным» → «4 процент»)."""
 
-    def __init__(self, analyzer=None, units: bool = False):
+    def __init__(self, analyzer=None, units: bool = True):
         if analyzer is None:
             import pymorphy3  # группа зависимостей reward
 
@@ -268,7 +273,7 @@ class Embedder(Protocol):
 class SentenceEmbedder:
     """Эмбеддер на sentence-transformers. Для e5 добавляет префиксы ``query:``/``passage:``."""
 
-    def __init__(self, name: str = "intfloat/multilingual-e5-small", device: str | None = None, batch_size: int = 32):
+    def __init__(self, name: str = "BAAI/bge-m3", device: str | None = None, batch_size: int = 32):
         from sentence_transformers import SentenceTransformer  # группа зависимостей reward
 
         self.model = SentenceTransformer(name, device=device)
@@ -373,7 +378,7 @@ def visual_details(deck: Deck, report, content_slides: int, images_allowed: bool
     ``direct`` — переполнение, ошибки отрисовки, формулы сверх предела и выдуманные цитаты не входят в сумму (их
     штрафует ``score`` напрямую). ``tau`` — пороги связи визуала со слайдом по видам (None — без проверки): ниже
     порога — ни бонуса, ни штрафа; вид из ``CHECKED_VISUALS`` без порога — за ``unverified`` бонуса; одинаковые
-    элементы (вид и текст) засчитываются один раз. Для проверки нужен ``embedder``.
+    элементы (вид и текст) засчитываются один раз, повтор — как элемент сверх предела. Нужен ``embedder``.
     """
     statuses: dict[tuple[int, int], str] = {}
     if report is not None:
@@ -385,6 +390,7 @@ def visual_details(deck: Deck, report, content_slides: int, images_allowed: bool
     entries: list[tuple[str, float]] = []  # вид, вес бонуса
     checks: list[tuple[int, str, str]] = []  # номер в entries, текст визуала, текст слайда
     seen: set[tuple[str, str]] = set()
+    duplicate_formulas = 0
     for number, slide in enumerate(deck.slides, 1):
         body = None
         for element in slide.elements:
@@ -413,8 +419,9 @@ def visual_details(deck: Deck, report, content_slides: int, images_allowed: bool
             if tau is not None:
                 text = visual_text(element)
                 key = (element.kind, _normalize_quote(text))
-                if key in seen:
+                if key in seen:  # повтор — как элемент сверх предела
                     result.duplicates += 1
+                    duplicate_formulas += element.kind == "FORMULA"
                     continue
                 seen.add(key)
                 if element.kind in CHECKED_VISUALS:
@@ -452,10 +459,10 @@ def visual_details(deck: Deck, report, content_slides: int, images_allowed: bool
         within += ws[:limit]
         over += max(0, len(ws) - limit)
     within.sort(reverse=True)
-    over += max(0, len(within) - total_limit)
+    over += max(0, len(within) - total_limit) + result.duplicates - duplicate_formulas
     formulas = len(by_kind.get("FORMULA", []))
     formula_within = min(formulas, FORMULA_TOTAL_PER_SLIDE * n)
-    result.formula_over = formulas - formula_within
+    result.formula_over = formulas - formula_within + duplicate_formulas
     value = sum(within[:total_limit]) + FORMULA_VALUE * formula_within - over
     if not direct:
         value -= (FORMULA_OVER_PENALTY * result.formula_over + result.slide_overflow
@@ -512,7 +519,7 @@ class RewardWeights:
     """Временные веса; подбираются на испорченных презентациях (train/validation)."""
 
     title: float = 0.15  # доля заголовка в сходстве тезиса со слайдом
-    alpha: float = 0.0  # доля лексической части в сходстве утверждения (кандидат)
+    alpha: float = 0.2  # доля лексической части в сходстве утверждения (решение 07.11.2026, EXP-014)
     coverage: float = 1.0
     keys: float = 0.5
     length: float = 1.0
@@ -524,16 +531,17 @@ class RewardWeights:
     bad_source: float = 0.1  # за каждый #SOURCE с id не из этого эпизода (решение 27.10.2026)
     format: float = 0.1  # вес штрафа 1 − parse_rate (временный, малый)
     text_overflow: float = 0.1  # за каждый слайд с не поместившимся текстом (решение 27.10.2026)
-    # кандидаты 07.11.2026 (EXP-014); по умолчанию выключены
+    # изменения 07.11.2026 (EXP-014, EXP-016): не подтвердились — выключены, оставлены для воспроизведения абляций
     relative: bool = False  # покрытие относительно фона (нужен score(backgrounds=...))
     keys_gate: bool = False  # ключ — только на слайде со сходством выше фона (нужен фон)
-    contradiction: float = 0.0  # за ключ с числовым противоречием (кандидат — 0,05)
-    direct_penalties: bool = False  # прямые штрафы вместо долей визуальной суммы
+    contradiction: float = 0.0  # за ключ с числовым противоречием (в абляциях — 0,05)
+    # приняты
+    direct_penalties: bool = True  # прямые штрафы вместо долей визуальной суммы
     overflow_penalty: float = 0.05  # элемент сверх ограничения слайда
     render_penalty: float = 0.05  # ошибка отрисовки, неопределённый график
     formula_over_penalty: float = 0.05  # формула сверх 2·N
     fake_quote_penalty: float = 0.1  # цитата, которой нет в выдаче
-    visual_tau: dict[str, float] | None = None  # пороги связи визуала со слайдом; None — без проверки
+    visual_tau: dict[str, float] | None = field(default_factory=lambda: dict(VISUAL_TAU))  # None — без проверки
     visual_unverified: float = 0.5  # доля бонуса за вид визуала без порога
 
 

@@ -308,7 +308,7 @@ def test_units_numbers_and_currencies():
     assert ULEM.lemmas("8,5% и 4-процентным") == ["8.5", "процент", "и", "4", "процент"]
     assert ULEM.lemmas("2 миллиона ₽") == ["2", "млн", "рубль"]
     assert ULEM.lemmas("10 000 рублей") == ULEM.lemmas("10 тысяч рублей")
-    assert Lemmatizer(UnitAnalyzer()).lemmas("8,5% и 10 тысяч") == ["8.5", "и", "10", "тысяча"]  # прежнее поведение
+    assert Lemmatizer(UnitAnalyzer(), units=False).lemmas("8,5% и 10 тысяч") == ["8.5", "и", "10", "тысяча"]  # прежнее поведение
 
 
 def test_numeric_contradiction_is_penalized_once_per_key():
@@ -372,9 +372,10 @@ def test_direct_penalties_replace_visual_sum():
     assert new.value == pytest.approx(2 * 0.7 / 2)
     assert old.value == pytest.approx((2 * 0.7 - 0.2 - 0.25) / 2)
     kwargs = dict(conclusion=False, slide_range=None, embedder=EMB, lemmatizer=LEM, tool_text="другое")
-    w = RewardWeights(direct_penalties=True)
+    w = RewardWeights(direct_penalties=True, visual_tau=None)
     direct = score(deck, [KeyPoint("Сила", "знание", [])], weights=w, **kwargs)
-    before = score(deck, [KeyPoint("Сила", "знание", [])], **kwargs)
+    before = score(deck, [KeyPoint("Сила", "знание", [])], weights=RewardWeights(direct_penalties=False, visual_tau=None),
+                   **kwargs)
     assert direct.visual > before.visual
     assert (direct.fake_quotes, direct.formula_over) == (1, 0)  # N = 2: формул до 4
     assert direct.total - before.total == pytest.approx(w.visual * (direct.visual - before.visual) - 0.1)
@@ -387,5 +388,16 @@ def test_visual_relevance_threshold_duplicates_and_unverified_kinds():
     result = visual_details(deck, None, 2, True, None, embedder=EMB, tau={"IMAGE": 0.3})
     assert result.duplicates == 1 and result.unrelated == 1
     assert result.counted == {"IMAGE": 1, "DIAGRAM": 1}
-    assert result.value == pytest.approx((1 + 0.5) / 4)  # у схемы нет порога — половина бонуса
+    assert result.value == pytest.approx((1 + 0.5 - 1) / 4)  # у схемы нет порога — половина бонуса; повтор — −1
     assert visual_details(deck, None, 2, True, None).counted == {"IMAGE": 3, "DIAGRAM": 1}  # прежнее поведение
+
+
+def test_defaults_are_the_accepted_changes():
+    """Решение 07.11.2026 (EXP-016): по умолчанию — прямые штрафы, связь визуала со слайдом, числа и единицы."""
+    w = RewardWeights()
+    assert w.direct_penalties and w.visual_tau == {"IMAGE": 0.411, "DIAGRAM": 0.522} and w.alpha == 0.2
+    assert not (w.relative or w.keys_gate or w.contradiction)
+    assert Lemmatizer(UnitAnalyzer()).lemmas("10 тысяч") == ["10000"]
+    deck = deck_of(["#TITLE: Тема"], ["#TITLE: Слайд", "#TEXT: текст", "#FORMULA: a", "#FORMULA: a"], ["#TITLE: Итог"])
+    result = visual_details(deck, None, 1, True, None, embedder=EMB, tau={})
+    assert result.duplicates == 1 and result.formula_over == 1  # повтор формулы — как формула сверх предела

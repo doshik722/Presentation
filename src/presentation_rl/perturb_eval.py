@@ -260,15 +260,17 @@ def check_pairs(pairs: list[dict], items: dict[tuple, Item]) -> tuple[list[dict]
 
 # --------------------------------------------------------------------------- награда по сетке
 
-# варианты награды для абляций (решение 07.11.2026); visual_tau=True — подставить откалиброванные пороги
+# варианты награды для абляций (решение 07.11.2026, EXP-016); visual_tau=True — подставить откалиброванные пороги.
+# «base» — награда EXP-014 (по умолчанию в RewardWeights теперь принятые изменения, поэтому прежнее задано явно)
+OLD = {"direct_penalties": False, "visual_tau": None}
 VARIANTS: dict[str, dict] = {
-    "base": {},
-    "relative": {"relative": True},
-    "keys_gate": {"keys_gate": True},
-    "units": {},  # только лемматизатор с числами и единицами
-    "contradiction": {"contradiction": 0.05},
-    "direct": {"direct_penalties": True},
-    "visual_link": {"visual_tau": True},
+    "base": dict(OLD),
+    "relative": {**OLD, "relative": True},
+    "keys_gate": {**OLD, "keys_gate": True},
+    "units": dict(OLD),  # только лемматизатор с числами и единицами
+    "contradiction": {**OLD, "contradiction": 0.05},
+    "direct": {**OLD, "direct_penalties": True},
+    "visual_link": {**OLD, "visual_tau": True},
     "all": {"relative": True, "keys_gate": True, "contradiction": 0.05, "direct_penalties": True, "visual_tau": True},
 }
 UNITS_VARIANTS = frozenset({"units", "all"})
@@ -284,7 +286,7 @@ class Config:
 
     def weights(self, base: RewardWeights | None = None, tau: dict[str, float] | None = None) -> RewardWeights:
         overrides = dict(VARIANTS[self.variant])
-        if overrides.pop("visual_tau", False):
+        if overrides.get("visual_tau") is True:
             if tau is None:
                 raise ValueError(f"{self.variant}: нужны пороги связи визуала со слайдом (calibrate_tau)")
             overrides["visual_tau"] = dict(tau)
@@ -313,11 +315,13 @@ def ablation_configs(embedder: str, alpha: float, lengths: Sequence[float], keys
     return configs
 
 
-def _units_twin(lemmatizer: Lemmatizer) -> Lemmatizer:
-    """Лемматизатор с числами и единицами на том же анализаторе (один на исходный, со своим кешем)."""
-    if getattr(lemmatizer, "_units_twin", None) is None:
-        lemmatizer._units_twin = Lemmatizer(lemmatizer.analyzer, units=True)
-    return lemmatizer._units_twin
+def _with_units(lemmatizer: Lemmatizer, units: bool) -> Lemmatizer:
+    """Лемматизатор с числами и единицами или без них на том же анализаторе (двойник — один, со своим кешем)."""
+    if lemmatizer.units == units:
+        return lemmatizer
+    if getattr(lemmatizer, "_twin", None) is None:
+        lemmatizer._twin = Lemmatizer(lemmatizer.analyzer, units=units)
+    return lemmatizer._twin
 
 
 def score_items(items: dict[tuple, Item], points: dict[str, list[KeyPoint]], config: Config, embedder,
@@ -327,7 +331,7 @@ def score_items(items: dict[tuple, Item], points: dict[str, list[KeyPoint]], con
     ``foreign`` — чужие презентации для фона тезисов (нужны вариантам с ``relative``/``keys_gate``),
     ``tau`` — пороги связи визуала со слайдом (вариантам с ``visual_tau``)."""
     weights = config.weights(tau=tau)
-    lemmatizer = _units_twin(lemmatizer) if config.units else lemmatizer
+    lemmatizer = _with_units(lemmatizer, config.units)
     need_background = weights.relative or weights.keys_gate
     if need_background and not foreign:
         raise ValueError(f"{config.name}: нужен фон — чужие презентации (load_foreign)")
