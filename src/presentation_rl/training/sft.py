@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -185,10 +186,13 @@ def train(config: SFTConfig, train_samples: list[Sample], eval_samples: list[Sam
             loss = masked_loss(model, inputs, num_items_in_batch)
             return (loss, {}) if return_outputs else loss  # при оценке нужен только loss
 
+    # разогрев — числом шагов: warmup_ratio убран из TrainingArguments в transformers 5
+    steps = math.ceil(len(train_samples) / config.grad_accum) * config.epochs
+    warmup_steps = max(1, math.ceil(config.warmup_ratio * steps))
     args = TrainingArguments(
         output_dir=str(out_dir / "checkpoints"), per_device_train_batch_size=1, per_device_eval_batch_size=1,
         gradient_accumulation_steps=config.grad_accum, num_train_epochs=config.epochs,
-        learning_rate=config.learning_rate, lr_scheduler_type="cosine", warmup_ratio=config.warmup_ratio,
+        learning_rate=config.learning_rate, lr_scheduler_type="cosine", warmup_steps=warmup_steps,
         fp16=True, logging_steps=1, eval_strategy="epoch", save_strategy="epoch", save_total_limit=1,
         load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False,
         remove_unused_columns=False, report_to="none", seed=config.seed, dataloader_pin_memory=False,
