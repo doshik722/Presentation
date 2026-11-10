@@ -117,3 +117,39 @@ def test_no_search_mode_refuses_calls_and_ends_after_two_refusals():
     episode = run_episode(tok.encode("п" + NEXT_TURN), tok, script, None)
     assert episode.finish == "max_turns" and len(episode.calls) == 3 and len(script.inputs) == 3
     assert episode.calls[-1]["chars"] == 0  # третий вызов остался без ответа
+
+
+def test_context_limit_truncates_tool_output_and_stops(tools):
+    """Предел контекста: выдача обрезается под остаток (с пометкой), генерация не выходит за предел."""
+    from presentation_rl.environment import REPLY_RESERVE, TRUNCATED
+
+    tok = CharTokenizer()
+    prompt = tok.encode("п" + NEXT_TURN)
+    full = run_episode(prompt, tok, Script(tok, [CALL + END, "#SLIDE" + END]), tools)
+    limit = len(full.ids) - 40 + REPLY_RESERVE  # выдача целиком не помещается
+    script = Script(tok, [CALL + END, "#SLIDE\n" + "x" * 500 + END])
+    episode = run_episode(prompt, tok, script, tools, max_context=limit)
+    assert episode.truncated_outputs == 1 and TRUNCATED in episode.segments[1].text
+    assert len(episode.ids) <= limit and episode.finish == "context"
+    assert episode.answer.startswith("#SLIDE")
+
+
+def test_context_too_small_for_tool_output_ends_episode(tools):
+    tok = CharTokenizer()
+    prompt = tok.encode("п" + NEXT_TURN)
+    from presentation_rl.environment import REPLY_RESERVE
+
+    episode = run_episode(prompt, tok, Script(tok, [CALL + END]), tools,
+                          max_context=len(prompt) + len(tok.encode(CALL + END)) + REPLY_RESERVE + 5)
+    assert episode.finish == "context" and [s.trainable for s in episode.segments] == [True]
+
+
+def test_generator_logprobs_are_kept():
+    tok = CharTokenizer()
+
+    def generate(ids, budget):
+        new = tok.encode("#SLIDE" + END)
+        return new, True, [-0.5] * len(new)
+
+    episode = run_episode(tok.encode("п"), tok, generate, None)
+    assert episode.segments[0].logprobs == [-0.5] * len(episode.segments[0].ids)

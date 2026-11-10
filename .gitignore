@@ -19,3 +19,6 @@ data/sources/*
 
 # настройки синхронизации с сервером (личные)
 .vscode/sftp.json
+
+# журналы туннеля Википедии
+scripts/wiki_tunnel/*.log

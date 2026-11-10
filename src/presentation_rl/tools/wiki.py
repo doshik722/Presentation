@@ -5,6 +5,13 @@
 Правила API Википедии: в заголовке User-Agent — название проекта и контакт (переменная окружения
 ``WIKI_CONTACT``), запросы по одному с паузой, повтор с ожиданием при перегрузке (429, 5xx, maxlag).
 
+Прокси для Википедии (решение 10.11.2026, по согласованию с администратором сервера): пока Википедия закрыта
+прокси пространства, запросы идут через туннель на компьютер автора — ``WikiClient(proxy=...)`` или переменная
+``WIKI_PROXY`` (например ``http://127.0.0.1:18080``, ``scripts/wiki_tunnel``). Через этот прокси идёт только
+Википедия; остальной трафик (Hugging Face, pip) — как обычно. TLS — сквозной: прокси лишь перекладывает байты
+(CONNECT), сертификат Википедии проверяется здесь. При разрыве туннеля сетевые ошибки повторяются до
+``network_patience`` секунд — туннель успевает переподключиться.
+
 Статья хранится по разделам: введение — раздел 0, дальше разделы в порядке текста; служебные разделы
 («Примечания», «Литература», «Ссылки» и т. п.) отбрасываются вместе с подразделами. Текст — простой текст API,
 таблицы и карточка статьи — из HTML той же правки, в конце своего раздела (``wiki_tables``).
@@ -215,8 +222,15 @@ class WikiClient:
         retries: int = 4,
         fetch: Callable[[str, dict], dict] | None = None,
         busy_delays: tuple[float, ...] = (5, 15, 30),
+        proxy: str | None = None,
+        network_patience: float = 300.0,
     ):
         contact = contact or os.environ.get("WIKI_CONTACT", "")
+        self.proxy = proxy if proxy is not None else os.environ.get("WIKI_PROXY", "")
+        # с туннелем сетевые ошибки повторяются дольше: разрыв — обычно секунды до переподключения
+        self.network_patience = network_patience if self.proxy else 0.0
+        handlers = [urllib.request.ProxyHandler({"https": self.proxy, "http": self.proxy})] if self.proxy else []
+        self._opener = urllib.request.build_opener(*handlers)
         if not contact and fetch is None:
             raise ValueError("укажите контакт для User-Agent: WikiClient(contact=...) или переменная WIKI_CONTACT")
         self.headers = {"User-Agent": USER_AGENT.format(contact=contact)}
@@ -232,7 +246,7 @@ class WikiClient:
 
     def _http_get(self, url: str, headers: dict) -> dict:
         request = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with self._opener.open(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
 
     def get(self, lang: str, params: dict) -> dict:
@@ -240,7 +254,10 @@ class WikiClient:
         url = f"https://{lang}.wikipedia.org/w/api.php?" + urllib.parse.urlencode(params)
         delay = 2.0
         busy = 0
-        for attempt in range(self.retries + len(self.busy_delays) + 1):
+        waited = 0.0  # сколько ждали из-за сетевых ошибок (терпение туннеля)
+        attempt = -1
+        while True:
+            attempt += 1
             wait = self.min_interval - (time.monotonic() - self._last)
             if wait > 0:
                 time.sleep(wait)
@@ -255,10 +272,12 @@ class WikiClient:
                     delay *= 2
                     continue
                 raise
-            except (urllib.error.URLError, TimeoutError) as exc:
+            except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
                 self.failures.append(f"сеть: {getattr(exc, 'reason', exc)}")
-                if attempt < self.retries:
-                    time.sleep(delay)
+                if attempt < self.retries or waited < self.network_patience:
+                    pause = min(delay, 30.0)
+                    time.sleep(pause)
+                    waited += pause
                     delay *= 2
                     continue
                 raise
@@ -275,7 +294,6 @@ class WikiClient:
             if "error" in data:
                 raise RuntimeError(f"API Википедии: {data['error']}")
             return data
-        raise RuntimeError("API Википедии не ответило")
 
     # --- запросы
 

@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import io
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -147,10 +148,11 @@ def build_from_text(
 
 
 def build_presentation(
-    deck: Deck, path: str | Path, theme: Theme | None = None, sources: SourceResolver | None = None,
+    deck: Deck, path: str | Path | None, theme: Theme | None = None, sources: SourceResolver | None = None,
     show_sources: bool = True,
 ) -> RenderReport:
-    """Собирает PPTX из разобранной презентации и сохраняет его в ``path``.
+    """Собирает PPTX из разобранной презентации и сохраняет его в ``path``; ``path=None`` — файл собирается в памяти
+    и не сохраняется (нужен только отчёт: награда в RL, проверка награды).
 
     Источники (``#SOURCE``) по id получает ``sources``; на слайде — строка с названиями и ссылками, а если источников
     больше двух или строка не помещается — номера, и тогда в конце добавляется слайд «Источники» со всем списком.
@@ -158,7 +160,7 @@ def build_presentation(
     но на слайды не выводятся.
     """
     theme = theme or Theme()
-    path = Path(path)
+    path = Path(path) if path is not None else None
     report = RenderReport(path=path)
     if not deck.slides:
         return report
@@ -183,11 +185,17 @@ def build_presentation(
             sources_slide = Slide(line=0, title="Источники")
             _SlideBuilder(prs.slides.add_slide(blank), sources_slide, index, index, theme, assets, report).sources_list()
             report.sources_slide = True
-        path.parent.mkdir(parents=True, exist_ok=True)
-        prs.save(path)
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            prs.save(path)
+            saved = path
+        else:
+            saved = io.BytesIO()
+            prs.save(saved)
+            saved.seek(0)
 
     try:
-        report.slide_count = len(Presentation(path).slides)
+        report.slide_count = len(Presentation(saved).slides)
         report.pptx_created = True
     except Exception:  # файл не открывается — это тоже результат, а не падение
         report.pptx_created = False

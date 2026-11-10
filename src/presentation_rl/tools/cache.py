@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from pathlib import Path
 
 from .wiki import Article, PageInfo, WikiClient
@@ -39,6 +40,7 @@ class WikiCache:
         self.page_infos: dict[tuple[str, str], PageInfo | None] = {}
         self.articles: dict[tuple[str, str], Article | None] = {}  # (язык, запрошенное или настоящее название)
         self.misses = 0  # сколько раз пришлось обращаться к Википедии
+        self.network_seconds = 0.0  # сколько времени заняли эти обращения (журнал RL)
         for record in self._read("searches.jsonl"):
             key = (record["lang"], record["query"], record["limit"], record["target"])
             self.searches[key] = [PageInfo(**p) for p in record["pages"]]
@@ -79,7 +81,9 @@ class WikiCache:
         key = (lang, query.strip(), limit, target)
         with self._lock:
             if key not in self.searches:
+                start = time.monotonic()
                 pages = self._client(f"search {key}").search_pages(lang, key[1], limit, target)
+                self.network_seconds += time.monotonic() - start
                 self.searches[key] = pages
                 self._append("searches.jsonl", {"lang": lang, "query": key[1], "limit": limit, "target": target,
                                                 "pages": [p.to_json() for p in pages]})
@@ -89,7 +93,10 @@ class WikiCache:
         with self._lock:
             missing = [t for t in dict.fromkeys(titles) if (lang, t) not in self.page_infos]
             if missing:
-                for title, page in self._client(f"pages {lang} {missing}").pages(lang, missing).items():
+                start = time.monotonic()
+                found = self._client(f"pages {lang} {missing}").pages(lang, missing)
+                self.network_seconds += time.monotonic() - start
+                for title, page in found.items():
                     self.page_infos[(lang, title)] = page
                     self._append("pages.jsonl", {"lang": lang, "requested": title,
                                                  "page": page.to_json() if page else None})
@@ -98,7 +105,9 @@ class WikiCache:
     def article(self, lang: str, title: str) -> Article | None:
         with self._lock:
             if (lang, title) not in self.articles:
+                start = time.monotonic()
                 article = self._client(f"article {lang} {title}").article(lang, title)
+                self.network_seconds += time.monotonic() - start
                 self.articles[(lang, title)] = article
                 if article is None:
                     self._append("articles.jsonl", {"lang": lang, "requested": title, "missing": True})

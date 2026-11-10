@@ -301,3 +301,14 @@ def test_hidden_sources_are_checked_but_not_drawn(tmp_path):
     assert len(report.sources) == 3 and report.count("bad_source") == 1
     assert not report.sources_slide and report.slide_count == 2
     assert "Источник" not in " ".join(_slide_texts(path))
+
+
+def test_report_without_saving_file(tmp_path):
+    """path=None: презентация собирается в памяти ради отчёта, файл не пишется."""
+    from presentation_rl.dsl import parse
+    from presentation_rl.rendering.builder import build_presentation
+
+    deck = parse("#SLIDE\n#TITLE: Тема\n#TEXT: текст\n#SLIDE\n#TITLE: Второй\n#TEXT: ещё текст")
+    report = build_presentation(deck, None)
+    assert report.pptx_created and report.slide_count == 2 and report.path is None
+    assert not list(tmp_path.iterdir())

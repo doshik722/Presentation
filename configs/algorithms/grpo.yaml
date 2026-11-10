@@ -1,8 +1,42 @@
-# Здесь будем фиксировать настройки GRPO; этот шаблон пока не запускает обучение.
+# Здесь задаём GRPO (μ = 1) по спецификации docs/grpo.md; обоснование каждого параметра — там же.
 algorithm: grpo
-implemented: false
-adaptation: lora
-lora_rank: 16
-learning_rate: null
-group_size: 4
-reward_weights: {}
+implemented: true
+runs_dir: runs/grpo
+sft_model: runs/sft/merged_20261107_1913   # слитая SFT-модель (тетрадка grpo.ipynb, ячейка слияния)
+vllm_url: http://127.0.0.1:8000
+vllm_base_name: sft                        # --served-model-name слитой модели на сервере vLLM
+wiki_snapshot: data/sources/wiki_cache     # снимок кеша: копируется в папку каждого запуска
+# шаг: 4 задания с поиском + 4 без, по 8 ответов; 150 шагов сбора = 9536 эпизодов
+tasks_per_mode: 4
+group_size: 8
+steps: 150
+# эпизод
+max_new_tokens: 8000
+max_context: 25000                         # по проверке памяти; не помещается — меньше (новая конфигурация)
+max_calls: 10
+temperature: 0.9                           # если EXP-017 не пройдёт — 0.8
+workers: 64
+# модель и оптимизатор
+lora_rank: 32
+lora_alpha: 32
+learning_rate: 1.0e-5
+betas: [0.9, 0.95]
+eps: 1.0e-8
+weight_decay: 0.0
+grad_clip: 1.0
+logits_chunk: 1024
+# loss
+kl_beta: 0.02
+clip_eps: 0.2                              # при μ = 1 не срабатывает
+std_floor: 0.02
+# validation и сохранение
+eval_every: 10
+val_topics: 8
+val_samples: 2
+keep_states: 2
+# контроль
+kl_old_new_episodes: 4
+max_logprob_mismatch: {mean_abs: null, p99: null}   # задаётся по пилоту (checks.logprob_check)
+max_skipped_updates: 0.05
+embedder_device: cuda:1
+seed: 0

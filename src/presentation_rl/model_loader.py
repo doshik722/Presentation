@@ -21,8 +21,11 @@ def load_model(model_id: str, revision: str = "main", dtype: str = "float16", de
     return model, tokenizer
 
 
-def hf_generator(model, tokenizer, temperature: float = 0.9, top_p: float = 1.0):
-    """Функция генерации для эпизода; temperature=0 — жадная генерация."""
+def hf_generator(model, tokenizer, temperature: float = 0.9, top_p: float = 1.0, top_k: int = 0):
+    """Функция генерации для эпизода; temperature=0 — жадная генерация.
+
+    Все параметры выборки задаются явно: иначе ``generate`` берёт недостающие из ``generation_config`` модели
+    (у T-lite там top-k 20, top-p 0,8, T = 0,7). ``top_k=0`` — без отсечения хвоста (решение 08.11.2026)."""
     import torch
 
     end_id = tokenizer.convert_tokens_to_ids("<|im_end|>")
@@ -32,11 +35,12 @@ def hf_generator(model, tokenizer, temperature: float = 0.9, top_p: float = 1.0)
         if max_new_tokens <= 0:
             return [], False
         input_ids = torch.tensor([ids], device=model.device)
-        sampling = {"do_sample": True, "temperature": temperature, "top_p": top_p} if temperature > 0 else {"do_sample": False}
+        sampling = ({"do_sample": True, "temperature": temperature, "top_p": top_p, "top_k": top_k}
+                    if temperature > 0 else {"do_sample": False})
         with torch.no_grad():
             output = model.generate(
                 input_ids, attention_mask=torch.ones_like(input_ids), max_new_tokens=max_new_tokens,
-                eos_token_id=stop_ids, pad_token_id=tokenizer.pad_token_id or end_id, **sampling,
+                eos_token_id=stop_ids, pad_token_id=tokenizer.pad_token_id or end_id, repetition_penalty=1.0, **sampling,
             )
         new = output[0, len(ids):].tolist()
         for i, token in enumerate(new):

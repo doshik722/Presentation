@@ -190,7 +190,8 @@ def test_tool_repeats_by_word_forms_and_ids():
     points = [KeyPoint("Матрица", "матрица и определитель", ["матрица"])]
     without = score(deck, points, conclusion=False, slide_range=(1, 1), embedder=EMB, lemmatizer=LEM)
     with_calls = score(deck, points, conclusion=False, slide_range=(1, 1), embedder=EMB, lemmatizer=LEM, calls=calls)
-    assert with_calls.repeats == 2 and without.total - with_calls.total == pytest.approx(penalty)
+    w = RewardWeights()  # цена вызова по умолчанию — 0,003 (решение 08.11.2026)
+    assert with_calls.repeats == 2 and without.total - with_calls.total == pytest.approx(w.tool_call * len(calls) + w.tool_repeat * 2)
 
 
 def test_no_search_calls_bad_sources_and_format():

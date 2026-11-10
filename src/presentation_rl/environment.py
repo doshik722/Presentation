@@ -10,7 +10,11 @@
 (входит в loss) или это ответ инструмента и разметка шаблона (не входит).
 
 Генерация передаётся функцией ``generate(ids, max_new_tokens) -> (новые id, закончила ли модель реплику)``, поэтому
-среда не зависит от того, чем генерировать (transformers, vLLM, заглушка в тестах).
+среда не зависит от того, чем генерировать (transformers, vLLM, заглушка в тестах). Генератор может вернуть третьим
+элементом log p выбранных токенов (vLLM) — они сохраняются в реплике для проверки расхождения с обучением.
+
+``max_context`` — общий предел длины эпизода в токенах (решение 08.11.2026, ``docs/grpo.md``): генерация не выходит
+за него, выдача инструментов обрезается под остаток, при исчерпании эпизод заканчивается (``finish="context"``).
 """
 from __future__ import annotations
 
@@ -29,11 +33,13 @@ TOOL_RESULT = "\n<tool_response>\n{}\n</tool_response>"
 NEXT_TURN = END + "\n<|im_start|>assistant\n<think>\n\n</think>\n\n"  # как add_generation_prompt шаблона
 NO_SEARCH_MESSAGE = "Поиск в этом режиме недоступен. Пишите презентацию без него."
 NO_SEARCH_REPLIES = 2  # после двух отказов следующий вызов заканчивает эпизод
+REPLY_RESERVE = 256  # токенов контекста, оставляемых модели после выдачи инструментов
+TRUNCATED = "\n[…выдача обрезана: контекст эпизода исчерпан]"
 
 _CALL_RE = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL)
 _ARGUMENTS = {"search": "query", "open": "id", "read": "id"}
 
-Generate = Callable[[list[int], int], tuple[list[int], bool]]
+Generate = Callable[[list[int], int], tuple]  # (новые id, закончила ли реплику[, log p выбранных токенов])
 
 
 class Tokenizer(Protocol):
@@ -47,6 +53,7 @@ class Segment:
     ids: list[int]
     text: str
     trainable: bool  # True — сгенерировала модель (входит в loss); False — ответы инструментов и разметка
+    logprobs: list[float] | None = None  # log p выбранных токенов по данным генератора (только реплики модели)
 
 
 @dataclass
@@ -62,7 +69,9 @@ class Episode:
     segments: list[Segment] = field(default_factory=list)
     answer: str = ""  # всё, что написала модель, без вызовов инструментов — это получает парсер DSL
     calls: list[dict] = field(default_factory=list)
-    finish: str = ""  # stop — модель закончила; length — кончились токены; max_turns — слишком много реплик
+    finish: str = ""  # stop — модель закончила; length — кончились токены модели; context — кончился контекст
+    # эпизода; max_turns — слишком много реплик
+    truncated_outputs: int = 0  # сколько раз выдачу инструментов обрезали под остаток контекста
     articles: dict = field(default_factory=dict)  # таблица id статей эпизода (для лога и проверки источников)
 
     @property
@@ -128,6 +137,7 @@ def run_episode(
     generate: Generate,
     tools: WikiTools | None = None,
     max_new_tokens: int = 8000,
+    max_context: int | None = None,
 ) -> Episode:
     """Генерация с вызовами инструментов до конца ответа, лимита токенов или лимита реплик.
 
@@ -144,16 +154,22 @@ def run_episode(
     turns = tools.max_calls + 2 if tools is not None else NO_SEARCH_REPLIES + 1
     episode.finish = "max_turns"
     for turn in range(turns):
-        new, finished = generate(ids, budget)
+        room = budget if max_context is None else min(budget, max_context - len(ids))
+        if room <= 0:
+            episode.finish = "length" if budget <= 0 else "context"
+            break
+        result = generate(ids, room)
+        new, finished = list(result[0]), result[1]
+        logprobs = list(result[2]) if len(result) > 2 and result[2] is not None else None
         budget -= len(new)
         text = tokenizer.decode(new, skip_special_tokens=False)
-        episode.segments.append(Segment(list(new), text, True))
+        episode.segments.append(Segment(new, text, True, logprobs))
         ids += new
         content = text[:-len(END)] if text.endswith(END) else text
         clean, calls = parse_tool_calls(content)
         parts.append(clean)
         if not finished:
-            episode.finish = "length"
+            episode.finish = "context" if room < budget + len(new) else "length"
             break
         if not calls:
             episode.finish = "stop"
@@ -168,10 +184,14 @@ def run_episode(
             results = [NO_SEARCH_MESSAGE] * len(calls)
         else:
             results = [_execute(tools, call, episode) for call in calls]
-        block = TOOL_RESULTS_START + "".join(TOOL_RESULT.format(r) for r in results) + NEXT_TURN
-        if not text.endswith(END):  # модель закончила реплику без <|im_end|> (например, по eos) — дописываем
-            block = END + "\n" + block.lstrip("\n")
-        block_ids = tokenizer.encode(block, add_special_tokens=False)
+        block, block_ids = _tool_block(tokenizer, results, text.endswith(END))
+        if max_context is not None and len(ids) + len(block_ids) > max_context - REPLY_RESERVE:
+            fitted = _fit_block(tokenizer, results, text.endswith(END), max_context - REPLY_RESERVE - len(ids))
+            if fitted is None:  # не помещается даже обрезанная выдача — эпизод кончается
+                episode.finish = "context"
+                break
+            block, block_ids = fitted
+            episode.truncated_outputs += 1
         episode.segments.append(Segment(block_ids, block, False))
         ids += block_ids
         if budget <= 0:
@@ -181,6 +201,28 @@ def run_episode(
     if tools is not None:
         episode.articles = tools.table()
     return episode
+
+
+def _tool_block(tokenizer, results: list[str], ended: bool) -> tuple[str, list[int]]:
+    block = TOOL_RESULTS_START + "".join(TOOL_RESULT.format(r) for r in results) + NEXT_TURN
+    if not ended:  # модель закончила реплику без <|im_end|> (например, по eos) — дописываем
+        block = END + "\n" + block.lstrip("\n")
+    return block, tokenizer.encode(block, add_special_tokens=False)
+
+
+def _fit_block(tokenizer, results: list[str], ended: bool, allowed: int) -> tuple[str, list[int]] | None:
+    """Выдача, обрезанная так, чтобы блок занял не больше ``allowed`` токенов; None — не помещается и пустая.
+    Каждый результат обрезается до равной доли остатка (по токенам) с пометкой ``TRUNCATED``."""
+    _, frame = _tool_block(tokenizer, [TRUNCATED] * len(results), ended)
+    share = (allowed - len(frame)) // max(1, len(results))
+    while share > 0:
+        cut = [tokenizer.decode(tokenizer.encode(r, add_special_tokens=False)[:share], skip_special_tokens=False)
+               + TRUNCATED for r in results]
+        block, block_ids = _tool_block(tokenizer, cut, ended)
+        if len(block_ids) <= allowed:
+            return block, block_ids
+        share = int(share * 0.9)  # перекодирование обрезанного текста может дать чуть больше токенов
+    return None
 
 
 def _execute(tools: WikiTools, call: ToolCall, episode: Episode) -> str:

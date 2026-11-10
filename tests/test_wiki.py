@@ -138,3 +138,38 @@ def test_client_waits_when_search_is_too_busy():
     finally:
         wiki.time.sleep = sleep
     assert [s for s in sleeps if s >= 5] == [5, 15, 5, 15, 30]
+
+
+def test_client_proxy_waits_for_tunnel_and_uses_proxy_handler():
+    """С прокси (туннель) сетевые ошибки повторяются до network_patience, а не только retries раз."""
+    import urllib.error
+    import urllib.request
+
+    import presentation_rl.tools.wiki as wiki
+
+    client = WikiClient(contact="x", proxy="http://127.0.0.1:18080", min_interval=0, retries=1,
+                        network_patience=60)
+    handlers = [h for h in client._opener.handlers if isinstance(h, urllib.request.ProxyHandler)]
+    assert handlers and handlers[0].proxies["https"] == "http://127.0.0.1:18080"
+    failures = [urllib.error.URLError("refused")] * 4
+    answers = failures + [{"query": {"search": []}}]
+
+    def fetch(url, headers):
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    client._fetch = fetch
+    sleeps = []
+    sleep, wiki.time.sleep = wiki.time.sleep, sleeps.append
+    try:
+        assert client.search("ru", "спуск") == []  # без прокси упало бы после второй попытки
+        assert sleeps == [2.0, 4.0, 8.0, 16.0]
+        answers[:] = [urllib.error.URLError("refused")] * 10
+        with pytest.raises(urllib.error.URLError):
+            client.search("ru", "спуск")
+    finally:
+        wiki.time.sleep = sleep
+    direct = WikiClient(contact="x", proxy="")  # без туннеля — как раньше: прокси пространства из окружения
+    assert direct.network_patience == 0 and direct.proxy == ""

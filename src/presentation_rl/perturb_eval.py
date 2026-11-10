@@ -19,7 +19,6 @@ import json
 import math
 import random
 import statistics
-import tempfile
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Iterable, Sequence
@@ -229,13 +228,12 @@ def author_answers(path: str | Path) -> list[dict]:
 
 def build_all(items: dict[tuple, Item], log: Callable[[str], None] = print) -> None:
     """Собирает каждую презентацию один раз (pptx во временную папку): отчёт сборщика нужен награде."""
-    folder = Path(tempfile.mkdtemp())
     for k, item in enumerate(items.values()):
         if item.deck is not None:
             continue
         item.deck = parse(item.text)
         sources = item.context.get("sources") or {}
-        item.report = build_presentation(item.deck, folder / "deck.pptx", None, sources.get, True)
+        item.report = build_presentation(item.deck, None, None, sources.get, True)  # файл не нужен — только отчёт
         if (k + 1) % 200 == 0:
             log(f"собрано {k + 1} из {len(items)}")
 
@@ -262,7 +260,7 @@ def check_pairs(pairs: list[dict], items: dict[tuple, Item]) -> tuple[list[dict]
 
 # варианты награды для абляций (решение 07.11.2026, EXP-016); visual_tau=True — подставить откалиброванные пороги.
 # «base» — награда EXP-014 (по умолчанию в RewardWeights теперь принятые изменения, поэтому прежнее задано явно)
-OLD = {"direct_penalties": False, "visual_tau": None}
+OLD = {"direct_penalties": False, "visual_tau": None, "tool_call": 0.02}
 VARIANTS: dict[str, dict] = {
     "base": dict(OLD),
     "relative": {**OLD, "relative": True},
@@ -271,9 +269,11 @@ VARIANTS: dict[str, dict] = {
     "contradiction": {**OLD, "contradiction": 0.05},
     "direct": {**OLD, "direct_penalties": True},
     "visual_link": {**OLD, "visual_tau": True},
-    "all": {"relative": True, "keys_gate": True, "contradiction": 0.05, "direct_penalties": True, "visual_tau": True},
+    "all": {"relative": True, "keys_gate": True, "contradiction": 0.05, "direct_penalties": True, "visual_tau": True,
+            "tool_call": 0.02},
+    "accepted": {},  # принятая награда — значения по умолчанию RewardWeights (решения 07–08.11.2026)
 }
-UNITS_VARIANTS = frozenset({"units", "all"})
+UNITS_VARIANTS = frozenset({"units", "all", "accepted"})
 
 
 @dataclass(frozen=True)
