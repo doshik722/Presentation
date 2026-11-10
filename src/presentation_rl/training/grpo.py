@@ -338,8 +338,8 @@ def train(config: RLConfig, root: str | Path = ".", run_dir: str | Path | None =
             counters["network_seconds"] += cache.network_seconds - network_before
             journals["steps"].write({
                 "step": step, "tasks": batch, "advantage": advantage_stats, **stats, **summarize(rollouts),
-                "time": {"generation": generated - began, "reward": rewarded - generated, "train": trained - rewarded,
-                         "adapter": published - trained, "network": cache.network_seconds - network_before},
+                "seconds": {"generation": generated - began, "reward": rewarded - generated, "train": trained - rewarded,
+                            "adapter": published - trained, "network": cache.network_seconds - network_before},
                 "counters": dict(counters), "queue": queue.state(),
             })
             if counters["skipped"] > config.max_skipped_updates * step:
