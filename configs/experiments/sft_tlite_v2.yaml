@@ -1,0 +1,14 @@
+# Здесь задаём второй SFT-разогрев T-lite (EXP-020): дополненные данные, скорость вдвое ниже, адаптер каждой эпохи.
+model_id: t-tech/T-lite-it-2.1
+revision: main
+lora_rank: 32
+lora_alpha: 32
+learning_rate: 0.0001
+epochs: 4
+grad_accum: 8
+warmup_ratio: 0.03
+eval_tasks: 9
+eval_topics: [t006, t034, t039, t050, t052, t054, t062, t063, t066]  # как в первых запусках (split.json)
+seed: 0
+max_tokens: 16000
+save_epochs: true

@@ -40,6 +40,8 @@ class SFTConfig:
     eval_tasks: int = 9  # отложенные темы SFT: по loss на них выбирается эпоха
     seed: int = 0
     max_tokens: int = 16000  # длиннее — пример не берётся (печатается); проверяется до обучения
+    eval_topics: list | None = None  # отложенные темы списком (иначе — случайно по seed); с ними — их семейства
+    save_epochs: bool = False  # сохранить адаптер каждой эпохи (epochs/epoch_<k>/), а не только лучший по loss
 
     @classmethod
     def load(cls, path: str | Path) -> "SFTConfig":
@@ -112,11 +114,22 @@ def build_samples(root: str | Path, tokenizer, prompt: Callable[[PresentationReq
     return samples
 
 
-def split(samples: list[Sample], eval_tasks: int, seed: int) -> tuple[list[Sample], list[Sample]]:
-    """Отложенные темы — все их примеры (без поиска и с поиском) только в оценку."""
+def split(samples: list[Sample], eval_tasks: int, seed: int, eval_topics: list[str] | None = None,
+          families: dict[str, str] | None = None) -> tuple[list[Sample], list[Sample]]:
+    """Отложенные темы — все их примеры (без поиска и с поиском) только в оценку. ``eval_topics`` — список тем
+    (иначе ``eval_tasks`` тем случайно по ``seed``); с ``families`` (id → семейство) отложены и все задания
+    тех же семейств: задание «один слайд» на тему из оценки не попадает в обучение."""
     topics = sorted({s.id for s in samples})
-    held = set(random.Random(seed).sample(topics, eval_tasks))
+    held = set(eval_topics) if eval_topics else set(random.Random(seed).sample(topics, eval_tasks))
+    if families:
+        held_families = {families[t] for t in held}
+        held = {t for t in topics if families[t] in held_families}
     return [s for s in samples if s.id not in held], [s for s in samples if s.id in held]
+
+
+def task_families(root: str | Path, tasks_path: str | Path = "data/tasks/tasks.json") -> dict[str, str]:
+    """id задания SFT → семейство тем."""
+    return {t.id: t.family for t in load_tasks(Path(root) / tasks_path, split="sft")}
 
 
 def drop_long(samples: list[Sample], max_tokens: int) -> tuple[list[Sample], list[Sample]]:
@@ -159,9 +172,31 @@ def masked_loss(model, inputs: dict, num_items_in_batch=None):
     return loss / denominator
 
 
+ADAPTER_FILES = ("adapter_config.json", "adapter_model.safetensors")
+
+
+def export_epochs(out_dir: str | Path) -> list[Path]:
+    """Адаптеры эпох из чекпоинтов Trainer (``checkpoints/checkpoint-<шаг>``, по одному на эпоху) —
+    в ``epochs/epoch_<k>/``; чекпоинты (с состоянием оптимизатора) после этого удаляются."""
+    import shutil
+
+    out_dir = Path(out_dir)
+    checkpoints = sorted((out_dir / "checkpoints").glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[1]))
+    exported = []
+    for epoch, checkpoint in enumerate(checkpoints, 1):
+        target = out_dir / "epochs" / f"epoch_{epoch}"
+        target.mkdir(parents=True, exist_ok=True)
+        for name in ADAPTER_FILES:
+            shutil.copy2(checkpoint / name, target / name)
+        exported.append(target)
+    shutil.rmtree(out_dir / "checkpoints", ignore_errors=True)
+    return exported
+
+
 def train(config: SFTConfig, train_samples: list[Sample], eval_samples: list[Sample], out_dir: str | Path,
           model=None, tokenizer=None):
-    """LoRA-SFT; в ``out_dir`` — лучший по loss на отложенных темах адаптер (``adapter/``) и журнал (``log.json``)."""
+    """LoRA-SFT; в ``out_dir`` — лучший по loss на отложенных темах адаптер (``adapter/``), журнал (``log.json``)
+    и при ``save_epochs`` — адаптеры всех эпох (``epochs/epoch_<k>/``)."""
     import torch
     from peft import LoraConfig, get_peft_model
     from transformers import Trainer, TrainingArguments
@@ -193,7 +228,8 @@ def train(config: SFTConfig, train_samples: list[Sample], eval_samples: list[Sam
         output_dir=str(out_dir / "checkpoints"), per_device_train_batch_size=1, per_device_eval_batch_size=1,
         gradient_accumulation_steps=config.grad_accum, num_train_epochs=config.epochs,
         learning_rate=config.learning_rate, lr_scheduler_type="cosine", warmup_steps=warmup_steps,
-        fp16=True, logging_steps=1, eval_strategy="epoch", save_strategy="epoch", save_total_limit=1,
+        fp16=True, logging_steps=1, eval_strategy="epoch", save_strategy="epoch",
+        save_total_limit=None if config.save_epochs else 1,
         load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False,
         remove_unused_columns=False, report_to="none", seed=config.seed, dataloader_pin_memory=False,
         prediction_loss_only=True,
@@ -202,6 +238,8 @@ def train(config: SFTConfig, train_samples: list[Sample], eval_samples: list[Sam
                             data_collator=collate)
     trainer.train()
     model.save_pretrained(out_dir / "adapter")
+    if config.save_epochs:
+        export_epochs(out_dir)
     (out_dir / "log.json").write_text(json.dumps(trainer.state.log_history, ensure_ascii=False, indent=1),
                                       encoding="utf-8")
     torch.cuda.empty_cache()
