@@ -368,6 +368,8 @@ class VisualResult:
     formula_over: int = 0  # формулы сверх 2·N
     unrelated: int = 0  # визуал, не связанный со слайдом (ниже τ)
     duplicates: int = 0  # повтор уже засчитанного элемента
+    checked: dict[str, int] = field(default_factory=dict)  # проверено на связь со слайдом, по видам (аналитика)
+    unrelated_kinds: dict[str, int] = field(default_factory=dict)  # из них ниже порога, по видам (аналитика)
 
 
 def visual_details(deck: Deck, report, content_slides: int, images_allowed: bool, tool_text: str | None, *,
@@ -438,8 +440,11 @@ def visual_details(deck: Deck, report, content_slides: int, images_allowed: bool
         unrelated = set()
         sims = pairwise_cosine(embedder, [c[1] for c in checks], [c[2] for c in checks])
         for (index, _, _), sim in zip(checks, sims):
-            if sim < tau[entries[index][0]]:
+            kind = entries[index][0]
+            result.checked[kind] = result.checked.get(kind, 0) + 1
+            if sim < tau[kind]:
                 unrelated.add(index)
+                result.unrelated_kinds[kind] = result.unrelated_kinds.get(kind, 0) + 1
         result.unrelated = len(unrelated)
         entries = [e for i, e in enumerate(entries) if i not in unrelated]
 
@@ -578,6 +583,8 @@ class RewardResult:
     contradictions: int = 0  # ключи с числовым противоречием
     formula_over: int = 0  # формулы сверх 2·N
     unrelated_visuals: int = 0  # визуал ниже порога связи со слайдом
+    visual_checked: dict[str, int] = field(default_factory=dict)  # проверено на связь, по видам (аналитика)
+    visual_unrelated: dict[str, int] = field(default_factory=dict)  # ниже порога связи, по видам (аналитика)
 
     def components(self) -> dict[str, float]:
         return {"total": self.total, "coverage": self.coverage, "keys": self.keys, "length": self.length,
@@ -703,7 +710,8 @@ def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_ran
                   + weights.formula_over_penalty * v.formula_over + weights.fake_quote_penalty * v.fake_quotes)
     return RewardResult(total, coverage, keys, length, v.value, v.forbidden, theses, v.counted, (low, high),
                         v.slide_overflow, v.render_errors, v.fake_quotes, bad_sources, format_penalty, overflow_slides,
-                        tools, repeats, contradictions, v.formula_over, v.unrelated)
+                        tools, repeats, contradictions, v.formula_over, v.unrelated,
+                        visual_checked=dict(v.checked), visual_unrelated=dict(v.unrelated_kinds))
 
 
 def load_key_points(path) -> dict[str, list[KeyPoint]]:

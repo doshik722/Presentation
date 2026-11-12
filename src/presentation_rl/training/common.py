@@ -40,16 +40,17 @@ class RLConfig:
 
     algorithm: str = "grpo"
     runs_dir: str = "runs/grpo"
-    sft_model: str = "runs/sft/merged_20261107_1913"  # слитая SFT-модель (``merge_sft``)
+    policy_model: str = "t-tech/T-lite-it-2.1"  # стартовая и опорная модель — исходная T-lite (решение 13.11.2026)
+    policy_revision: str = "main"  # хеш коммита из кеша HF пишется в манифест (``model_commit``)
     vllm_url: str = "http://127.0.0.1:8000"
-    vllm_base_name: str = "sft"  # --served-model-name слитой модели на сервере vLLM
+    vllm_base_name: str = "base"  # --served-model-name исходной модели на сервере vLLM
     wiki_snapshot: str = "data/sources/wiki_cache"  # снимок кеша: копируется в папку запуска на старте
     # шаг
     tasks_per_mode: int = 4
     group_size: int = 8
     steps: int = 150
     # эпизод
-    max_new_tokens: int = 8000
+    max_new_tokens: int = 12000  # решение 13.11.2026 (было 8000)
     max_context: int = 25000
     max_calls: int = 10
     temperature: float = 0.9
@@ -63,6 +64,8 @@ class RLConfig:
     weight_decay: float = 0.0
     grad_clip: float = 1.0
     logits_chunk: int = 1024
+    # награда
+    reward_floor: float = -1.0  # нижний порог награды эпизода (решение 12.11.2026)
     # loss
     kl_beta: float = 0.02
     clip_eps: float = 0.2
@@ -277,22 +280,25 @@ def vllm_generator(client, model_name: str, temperature: float, stops: list[int]
 class RewardModel:
     """Принятая награда (``rewards.score``, решение 07.11.2026) по готовому эпизоду и аналитика опоры на источники.
     Контекст эпизода (вызовы, показанная модели выдача, допустимые ``#SOURCE``) берётся из текста эпизода — то есть
-    только то, что модель действительно видела (после обрезаний)."""
+    только то, что модель действительно видела (после обрезаний). Награда эпизода обрезается снизу на ``floor``
+    (решение 12.11.2026); необрезанная остаётся в компонентах (``total``)."""
 
-    def __init__(self, root: str | Path, device: str | None = None, embedder=None, lemmatizer=None, weights=None):
+    def __init__(self, root: str | Path, device: str | None = None, embedder=None, lemmatizer=None, weights=None,
+                 floor: float = -1.0):
         from ..rewards import Lemmatizer, RewardWeights, SentenceEmbedder, load_key_points
 
         self.points = load_key_points(Path(root) / "data" / "tasks" / "key_points" / "key_points.json")
         self.embedder = embedder or SentenceEmbedder("BAAI/bge-m3", device=device)
         self.lemmatizer = lemmatizer or Lemmatizer()
         self.weights = weights or RewardWeights()
+        self.floor = floor
         self._lock = threading.Lock()  # эмбеддер и лемматизатор — по одному вызову за раз
 
     def __call__(self, task: Task, rollout: Rollout) -> None:
         from ..dsl import parse
         from ..perturb import task_context
         from ..rendering import build_presentation, pick_theme
-        from ..rewards import score
+        from ..rewards import VISUAL_KINDS, score
 
         search = rollout.mode == "search"
         context = task_context(task, rollout.text, search)
@@ -306,9 +312,14 @@ class RewardModel:
                            images_allowed=context["images_allowed"], tool_text=context["tool_text"],
                            calls=context["calls"], search=search, weights=self.weights)
             analytics = grounding(deck, report, context["tool_text"], self.lemmatizer) if search else {}
-        rollout.reward = float(result.total)
+        if search:
+            analytics |= search_stats(rollout.calls, rollout.text)
+        rollout.reward = max(float(result.total), self.floor)
         rollout.components = {k: float(v) for k, v in result.components().items()}
-        rollout.analytics = analytics | {"slides": len(deck.slides), "parse_rate": deck.parse_rate}
+        rollout.analytics = analytics | {"slides": len(deck.slides), "parse_rate": deck.parse_rate,
+                                         "format_errors": deck.error_counts(),
+                                         **episode_stats(deck, result, context["slide_range"] is not None, VISUAL_KINDS),
+                                         "conclusion_expected": bool(context["conclusion"])}
 
 
 def slide_facts(text: str, lemmatizer) -> set[str]:
@@ -326,6 +337,54 @@ def slide_facts(text: str, lemmatizer) -> set[str]:
         if parsed and NAME_GRAMMEMES & set(parsed[0].tag.grammemes):
             facts.add(parsed[0].normal_form.replace("ё", "е"))
     return facts
+
+
+def episode_stats(deck, result, explicit: bool, visual_kinds) -> dict:
+    """Аналитика ответа (только журнал, не награда): есть ли план (``#PLAN``) и заключение (последний слайд
+    из трёх и больше с заголовком «Вывод(ы)», «Заключение», «Итог(и)» — как в ``evaluation``); ожидаемое число слайдов (из запроса — ``explicit``, иначе
+    по тезисам темы); визуалы, которые модель написала (все и картинки); проверенные на связь со слайдом и ниже
+    порога — картинки и остальные виды отдельно (``rewards.VISUAL_TAU``)."""
+    kinds = [e.kind for s in deck.slides for e in s.elements if e.kind in visual_kinds]
+    checked, unrelated = result.visual_checked, result.visual_unrelated
+    from ..evaluation import CONCLUSION
+
+    low, high = result.expected_slides
+    n = len(deck.slides)
+    return {"has_plan": bool(deck.plan),
+            "has_conclusion": bool(n >= 3 and CONCLUSION.match(deck.slides[-1].title or "")),
+            "slides_low": low, "slides_high": high, "slides_explicit": explicit,
+            "visuals": len(kinds), "images": kinds.count("IMAGE"),
+            "images_checked": checked.get("IMAGE", 0), "images_unrelated": unrelated.get("IMAGE", 0),
+            "other_checked": sum(v for k, v in checked.items() if k != "IMAGE"),
+            "other_unrelated": sum(v for k, v in unrelated.items() if k != "IMAGE")}
+
+
+def search_stats(calls: list[dict], text: str) -> dict:
+    """Аналитика поиска в эпизоде (только журнал, не награда): вызовы и ошибочные (неразобранные) вызовы; поиски,
+    поиски без результатов, запросы без кириллицы; поиски с результатами и из них «повторные» — больше половины
+    найденных статей уже находили прежние поиски эпизода (запрос с одним добавленным словом, который ничего
+    нового не даёт). Выдача — из текста эпизода по порядку вызовов (у вызова, после которого эпизод кончился,
+    её нет)."""
+    import re
+
+    responses = re.findall(r"<tool_response>\n(.*?)\n</tool_response>", text, re.DOTALL)
+    out = {"tool_calls": len(calls), "tool_errors": sum(bool(c.get("error")) for c in calls), "searches": 0,
+           "searches_nothing": 0, "searches_en": 0, "searches_with_results": 0, "searches_repeated": 0}
+    seen: set[str] = set()
+    for call, response in zip(calls, responses + [None] * len(calls)):
+        if call.get("name") != "search" or call.get("error") or response is None:
+            continue
+        out["searches"] += 1
+        out["searches_en"] += not re.search("[а-яё]", call.get("argument") or "", re.IGNORECASE)
+        if "ничего не найдено" in response:
+            out["searches_nothing"] += 1
+            continue
+        found = set(re.findall(r"^(d\d+) \| (?:ru|en) \| ", response, re.MULTILINE))
+        if found:
+            out["searches_with_results"] += 1
+            out["searches_repeated"] += len(found & seen) > len(found) / 2
+            seen |= found
+    return out
 
 
 def grounding(deck, report, tool_text: str | None, lemmatizer) -> dict:
@@ -356,11 +415,46 @@ def summarize(rollouts: list[Rollout]) -> dict:
             continue
         prefix = f"{mode}_"
         out[prefix + "reward"] = mean([r.reward for r in part])
+        out[prefix + "floored"] = mean([float(r.components.get("total", r.reward) < r.reward) for r in part])
         for key in sorted({k for r in part for k in r.components}):
             out[prefix + key] = mean([r.components.get(key) for r in part])
         out[prefix + "calls"] = mean([len(r.calls) for r in part])
         out[prefix + "model_tokens"] = mean([r.model_tokens for r in part])
         out[prefix + "tokens"] = mean([len(r.ids) for r in part])
+        # доли оборванных эпизодов: контекст исчерпан (выдача и реплики) / предел токенов модели; с обрезанной выдачей
+        out[prefix + "finish_context"] = mean([float(r.finish == "context") for r in part])
+        out[prefix + "finish_length"] = mean([float(r.finish == "length") for r in part])
+        out[prefix + "truncated"] = mean([float(r.truncated_outputs > 0) for r in part])
+        # формат DSL: доля корректных строк, доля ответов без ошибок разбора, ошибки по кодам (сумма за шаг)
+        parsed = [r.analytics for r in part if "parse_rate" in r.analytics]
+        out[prefix + "parse_rate"] = mean([a["parse_rate"] for a in parsed])
+        out[prefix + "format_clean"] = mean([float(not a.get("format_errors")) for a in parsed if "format_errors" in a])
+        errors: dict[str, int] = {}
+        for a in parsed:
+            for code, count in (a.get("format_errors") or {}).items():
+                errors[code] = errors.get(code, 0) + count
+        out[prefix + "format_errors"] = dict(sorted(errors.items(), key=lambda kv: -kv[1]))
+        # слайды: попадание в ожидаемый диапазон — для запросов с числом слайдов и без него отдельно
+        ranged = [r.analytics for r in part if "slides_high" in r.analytics]
+        out[prefix + "slides"] = mean([a["slides"] for a in ranged])
+        for name, group in (("explicit", [a for a in ranged if a["slides_explicit"]]),
+                            ("auto", [a for a in ranged if not a["slides_explicit"]])):
+            out[f"{prefix}in_range_{name}"] = mean([float(a["slides_low"] <= a["slides"] <= a["slides_high"])
+                                                    for a in group])
+            out[f"{prefix}slides_off_{name}"] = mean([max(a["slides_low"] - a["slides"], a["slides"] - a["slides_high"], 0)
+                                                     for a in group])
+        # план и заключение: доли ответов; заключение — ещё и среди тем, где оно ожидается (тезис-заключение)
+        out[prefix + "with_plan"] = mean([float(a["has_plan"]) for a in ranged if "has_plan" in a])
+        out[prefix + "with_conclusion"] = mean([float(a["has_conclusion"]) for a in ranged if "has_conclusion" in a])
+        out[prefix + "with_conclusion_expected"] = mean([float(a["has_conclusion"]) for a in ranged
+                                                         if a.get("conclusion_expected") and "has_conclusion" in a])
+        # визуалы: сколько на эпизод и доля не связанных со слайдом среди проверенных
+        out[prefix + "visuals"] = mean([a["visuals"] for a in ranged])
+        out[prefix + "images"] = mean([a["images"] for a in ranged])
+        for name in ("images", "other"):
+            checked = sum(a[f"{name}_checked"] for a in ranged)
+            out[f"{prefix}{name}_unrelated_share"] = sum(a[f"{name}_unrelated"] for a in ranged) / checked \
+                if checked else None
         if mode == "search":
             out["search_share"] = mean([float(any(not c.get("error") for c in r.calls)) for r in part])
             with_facts = [r for r in part if r.analytics.get("facts")]
@@ -370,6 +464,14 @@ def summarize(rollouts: list[Rollout]) -> dict:
                                               for r in part if r.analytics.get("slides")])
             out["tool_calls"] = {name: sum(1 for r in part for c in r.calls if c.get("name") == name)
                                  for name in ("search", "open", "read")}
+            total = {k: sum(r.analytics.get(k, 0) for r in part) for k in
+                     ("tool_calls", "tool_errors", "searches", "searches_nothing", "searches_en",
+                      "searches_with_results", "searches_repeated")}
+            share = lambda a, b: total[a] / total[b] if total[b] else None  # noqa: E731
+            out["tool_error_share"] = share("tool_errors", "tool_calls")
+            out["search_nothing_share"] = share("searches_nothing", "searches")
+            out["search_en_share"] = share("searches_en", "searches")
+            out["search_repeated_share"] = share("searches_repeated", "searches_with_results")
     out["finish"] = {k: sum(1 for r in rollouts if r.finish == k) for k in sorted({r.finish for r in rollouts})}
     out["truncated_outputs"] = sum(r.truncated_outputs for r in rollouts)
     out["parse_rate"] = mean([r.analytics.get("parse_rate") for r in rollouts])
@@ -477,9 +579,20 @@ def start_manifest(run_dir: Path, config: RLConfig, root: str | Path, extra: dic
     root = Path(root)
     manifest = {"run": run_dir.name, "config": config.to_json(), "versions": versions(), "git": git_state(root),
                 "code": code_hashes(root / "src" / "presentation_rl"), "sessions": [], **extra}
-    sft = Path(root) / config.sft_model / "merged_hash.json"
-    manifest["sft_model"] = json.loads(sft.read_text(encoding="utf-8")) if sft.exists() else {"path": config.sft_model}
+    manifest["policy_model"] = {"id": config.policy_model, "revision": config.policy_revision,
+                                "commit": model_commit(config.policy_model, config.policy_revision)}
     return manifest
+
+
+def model_commit(model_id: str, revision: str) -> str | None:
+    """Хеш коммита модели в локальном кеше HF (тот же снимок читают ``transformers`` и vLLM); None — модели нет
+    в кеше."""
+    try:
+        from huggingface_hub import snapshot_download
+
+        return Path(snapshot_download(model_id, revision=revision, local_files_only=True)).name
+    except Exception:
+        return None
 
 
 def add_session(run_dir: Path, manifest: dict, from_step: int, root: str | Path, extra: dict | None = None) -> int:
@@ -632,14 +745,14 @@ def setup_torch() -> None:
 
 
 def load_policy(config: RLConfig, root: str | Path, device: str = "cuda:0", adapter: str | Path | None = None):
-    """Слитая SFT-модель во float16 + RL-LoRA во float32 (новый — с сидом запуска; ``adapter`` — продолжение)."""
+    """Исходная модель во float16 + RL-LoRA во float32 (новый — с сидом запуска; ``adapter`` — продолжение)."""
     import torch
     from peft import LoraConfig, PeftModel, get_peft_model
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    path = Path(root) / config.sft_model
-    tokenizer = AutoTokenizer.from_pretrained(path)
-    model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.float16, device_map={"": device},
+    tokenizer = AutoTokenizer.from_pretrained(config.policy_model, revision=config.policy_revision)
+    model = AutoModelForCausalLM.from_pretrained(config.policy_model, revision=config.policy_revision,
+                                                 torch_dtype=torch.float16, device_map={"": device},
                                                  attn_implementation="sdpa")
     model.config.use_cache = False
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})

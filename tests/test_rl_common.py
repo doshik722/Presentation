@@ -210,7 +210,88 @@ def test_summarize_by_mode():
     assert out["search_share"] == pytest.approx(0.5) and out["grounding"] == pytest.approx(0.5)
     assert out["grounding_no_facts"] == 1 and out["slides_with_source"] == pytest.approx(0.25)
     assert out["finish"] == {"stop": 3} and out["parse_rate"] == pytest.approx(5 / 6)
+    rollouts[1].finish = "context"
+    out = summarize(rollouts)
+    assert out["search_finish_context"] == pytest.approx(0.5) and out["plain_finish_context"] == 0.0
+    assert out["search_finish_length"] == 0.0 and out["plain_truncated"] == 0.0
 
+    def analytics(slides, low, high, explicit, images_checked, images_unrelated):
+        return {"slides": slides, "parse_rate": 1.0, "slides_low": low, "slides_high": high,
+                "has_plan": explicit, "has_conclusion": slides == 7, "conclusion_expected": slides != 5,
+                "slides_explicit": explicit, "visuals": 3, "images": images_checked,
+                "images_checked": images_checked, "images_unrelated": images_unrelated, "other_checked": 1,
+                "other_unrelated": 0}
+
+    out = summarize([rollout("plain", 0.1, [], analytics(7, 7, 7, True, 2, 1)),
+                     rollout("plain", 0.1, [], analytics(11, 7, 7, True, 0, 0)),
+                     rollout("plain", 0.1, [], analytics(5, 4, 6, False, 2, 0))])
+    assert out["plain_in_range_explicit"] == pytest.approx(0.5) and out["plain_slides_off_explicit"] == pytest.approx(2)
+    assert out["plain_in_range_auto"] == 1.0 and out["plain_slides_off_auto"] == 0.0
+    assert out["plain_images_unrelated_share"] == pytest.approx(0.25) and out["plain_other_unrelated_share"] == 0.0
+    assert out["plain_visuals"] == 3 and out["plain_slides"] == pytest.approx(23 / 3)
+    assert out["plain_with_plan"] == pytest.approx(2 / 3) and out["plain_with_conclusion"] == pytest.approx(1 / 3)
+    assert out["plain_with_conclusion_expected"] == pytest.approx(0.5)
+    rollouts = [rollout("plain", 0.1, [], {"parse_rate": 1.0, "format_errors": {}}),
+                rollout("plain", 0.1, [], {"parse_rate": 0.5, "format_errors": {"unknown_tag": 2, "bad_chart": 1}}),
+                rollout("plain", 0.1, [], {"parse_rate": 0.9, "format_errors": {"unknown_tag": 1}})]
+    out = summarize(rollouts)
+    assert out["plain_parse_rate"] == pytest.approx(0.8) and out["plain_format_clean"] == pytest.approx(1 / 3)
+    assert out["plain_format_errors"] == {"unknown_tag": 3, "bad_chart": 1}
+
+
+def test_search_stats_counts_errors_nothing_english_and_repeats():
+    from presentation_rl.training.common import search_stats
+
+    def response(body):
+        return f"<tool_response>\n{body}\n</tool_response>"
+
+    calls = [{"name": "search", "argument": "система счисления", "error": ""},
+             {"name": "search", "argument": "", "error": "у search один аргумент"},
+             {"name": "search", "argument": "система счисления история", "error": ""},
+             {"name": "search", "argument": "numeral system", "error": ""},
+             {"name": "open", "argument": "d1", "error": ""},
+             {"name": "search", "argument": "двоичная", "error": ""}]
+    text = "".join(response(b) for b in [
+        "Результаты поиска «система счисления»:\nd1 | ru | Система счисления | …\nd2 | ru | Позиционная | …",
+        "Ошибка вызова: у search один аргумент — query (строка).",
+        "Результаты поиска:\nd1 | ru | Система счисления | …\nd2 | ru | Позиционная | …\nd3 | ru | История | …",
+        "По запросу «numeral system» ничего не найдено. Попробуйте другие ключевые слова.",
+        "d1 | ru | Система счисления",
+    ])  # у последнего поиска выдачи нет — эпизод кончился
+    out = search_stats(calls, text)
+    assert out == {"tool_calls": 6, "tool_errors": 1, "searches": 3, "searches_nothing": 1, "searches_en": 1,
+                   "searches_with_results": 2, "searches_repeated": 1}
+    rollout = Rollout("t", "search", 0, [], [], [], text, "", "stop", calls, 0, 1.0, 0.0, {}, out)
+    summary = summarize([rollout])
+    assert summary["tool_error_share"] == pytest.approx(1 / 6)
+    assert summary["search_repeated_share"] == pytest.approx(0.5)
+    assert summary["search_nothing_share"] == pytest.approx(1 / 3) and summary["search_en_share"] == pytest.approx(1 / 3)
+
+
+def test_reward_model_floors_total_and_keeps_raw(monkeypatch):
+    from presentation_rl import dsl, perturb, rendering, rewards
+    from presentation_rl.training.common import RewardModel
+
+    raw = {"total": -28.6, "coverage": 0.1}
+    monkeypatch.setattr(rewards, "load_key_points", lambda path: {"t": []})
+    monkeypatch.setattr(perturb, "task_context", lambda task, text, search: {
+        "sources": None, "conclusion": False, "slide_range": None, "images_allowed": True, "tool_text": "",
+        "calls": [], "search": False})
+    monkeypatch.setattr(dsl, "parse", lambda answer: SimpleNamespace(slides=[], plan=[], parse_rate=1.0, error_counts=dict))
+    monkeypatch.setattr(rendering, "pick_theme", lambda theme, text: None)
+    monkeypatch.setattr(rendering, "build_presentation", lambda *args, **kwargs: None)
+    monkeypatch.setattr(rewards, "score", lambda *args, **kwargs: SimpleNamespace(
+        total=raw["total"], components=lambda: raw, expected_slides=(4, 6), visual_checked={}, visual_unrelated={}))
+    model = RewardModel(".", embedder=object(), lemmatizer=object(), floor=-1.0)
+    task = SimpleNamespace(id="t", request=SimpleNamespace(theme=None, text="", sources=False))
+    low = Rollout("t", "plain", 0, [], [], [], "", "", "stop", [], 0, 1.0)
+    model(task, low)
+    assert low.reward == -1.0 and low.components["total"] == pytest.approx(-28.6)
+    raw["total"] = 0.4
+    high = Rollout("t", "plain", 1, [], [], [], "", "", "stop", [], 0, 1.0)
+    model(task, high)
+    assert high.reward == pytest.approx(0.4)
+    assert summarize([low, high])["plain_floored"] == pytest.approx(0.5)
 
 def test_target_positions_select_exactly_the_model_tokens(tmp_path):
     """Сдвиг на позицию и маска на эпизоде с двумя репликами и выдачей: токены в позициях обучения — ровно

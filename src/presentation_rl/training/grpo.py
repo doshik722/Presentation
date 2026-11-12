@@ -193,7 +193,7 @@ def validate(client, model_name: str, tasks: dict, topics: list[str], samples: i
 
 def generate_reference(config: RLConfig, root: str | Path = ".", client=None, reward: RewardModel | None = None,
                        samples: int = 2) -> Path:
-    """Ответы SFT-модели на весь validation (25 тем × 2 режима × ``samples``) — один раз для всех запусков:
+    """Ответы исходной модели на весь validation (25 тем × 2 режима × ``samples``) — один раз для всех запусков:
     с ними судья сравнивает чекпоинты (малый validation — их часть, полный — ответы с номером 0)."""
     from transformers import AutoTokenizer
 
@@ -206,13 +206,13 @@ def generate_reference(config: RLConfig, root: str | Path = ".", client=None, re
     folder = root / config.runs_dir / "reference"
     folder.mkdir(parents=True, exist_ok=True)
     tasks = {t.id: t for t in load_tasks(root / "data" / "tasks" / "tasks.json", split="validation")}
-    tokenizer = AutoTokenizer.from_pretrained(root / config.sft_model)
+    tokenizer = AutoTokenizer.from_pretrained(config.policy_model, revision=config.policy_revision)
     client = client or VLLMClient(config.vllm_url)
-    reward = reward or RewardModel(root, device=config.embedder_device)
+    reward = reward or RewardModel(root, device=config.embedder_device, floor=config.reward_floor)
     cache = WikiCache(copy_snapshot(root / config.wiki_snapshot, folder), WikiClient(contact=wiki_contact()))
     rollouts = validate(client, config.vllm_base_name, tasks, sorted(tasks), samples, tokenizer, cache, reward,
                         config, folder / "episodes")
-    write_json(folder / "summary.json", {"model": config.vllm_base_name, "sft_model": config.sft_model,
+    write_json(folder / "summary.json", {"model": config.vllm_base_name, "policy_model": config.policy_model,
                                          "samples": samples, "summary": summarize(rollouts),
                                          "network_seconds": cache.network_seconds})
     return folder
@@ -282,7 +282,7 @@ def train(config: RLConfig, root: str | Path = ".", run_dir: str | Path | None =
         queue.load_state(state["queue"])
         counters.update(state["counters"])
 
-    reward = reward or RewardModel(root, device=config.embedder_device)
+    reward = reward or RewardModel(root, device=config.embedder_device, floor=config.reward_floor)
     prompt, stops = episode_prompt(tokenizer), stop_ids(tokenizer)
     adapters = run_dir / "adapters"
     adapters.mkdir(exist_ok=True)

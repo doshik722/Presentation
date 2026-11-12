@@ -388,6 +388,7 @@ def test_visual_relevance_threshold_duplicates_and_unverified_kinds():
                     "#DIAGRAM: type=flow; узел альфа -> узел бета"])
     result = visual_details(deck, None, 2, True, None, embedder=EMB, tau={"IMAGE": 0.3})
     assert result.duplicates == 1 and result.unrelated == 1
+    assert result.checked == {"IMAGE": 2} and result.unrelated_kinds == {"IMAGE": 1}
     assert result.counted == {"IMAGE": 1, "DIAGRAM": 1}
     assert result.value == pytest.approx((1 + 0.5 - 1) / 4)  # у схемы нет порога — половина бонуса; повтор — −1
     assert visual_details(deck, None, 2, True, None).counted == {"IMAGE": 3, "DIAGRAM": 1}  # прежнее поведение

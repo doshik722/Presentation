@@ -2,19 +2,20 @@
 algorithm: grpo
 implemented: true
 runs_dir: runs/grpo
-sft_model: runs/sft/merged_20261107_1913   # слитая SFT-модель (тетрадка grpo.ipynb, ячейка слияния)
+policy_model: t-tech/T-lite-it-2.1         # старт и опорная — исходная T-lite (decisions.md, раздел 9, 13.11.2026)
+policy_revision: main                      # хеш коммита из кеша HF — в манифесте запуска
 vllm_url: http://127.0.0.1:8000
-vllm_base_name: sft                        # --served-model-name слитой модели на сервере vLLM
+vllm_base_name: base                       # --served-model-name исходной модели на сервере vLLM
 wiki_snapshot: data/sources/wiki_cache     # снимок кеша: копируется в папку каждого запуска
 # шаг: 4 задания с поиском + 4 без, по 8 ответов; 150 шагов сбора = 9536 эпизодов
 tasks_per_mode: 4
 group_size: 8
 steps: 150
 # эпизод
-max_new_tokens: 8000
+max_new_tokens: 12000                      # просьбы о 25–30 слайдах ≈ 8,3–10 тыс. токенов; память — 30,3 из 31,7 ГБ
 max_context: 25000                         # по проверке памяти; не помещается — меньше (новая конфигурация)
 max_calls: 10
-temperature: 0.9                           # если EXP-017 не пройдёт — 0.8
+temperature: 0.9                           # EXP-019: у исходной T-lite вырожденных 1%; top-k выключен (vllm_client)
 workers: 64
 # модель и оптимизатор
 lora_rank: 32
@@ -25,6 +26,8 @@ eps: 1.0e-8
 weight_decay: 0.0
 grad_clip: 1.0
 logits_chunk: 1024
+# награда
+reward_floor: -1.0                         # нижний порог награды эпизода (решение 12.11.2026)
 # loss
 kl_beta: 0.02
 clip_eps: 0.2                              # при μ = 1 не срабатывает
