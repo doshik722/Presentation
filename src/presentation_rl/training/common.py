@@ -585,18 +585,17 @@ def start_manifest(run_dir: Path, config: RLConfig, root: str | Path, extra: dic
 
 
 def model_commit(model_id: str, revision: str) -> str | None:
-    """Хеш коммита модели, который берут ``transformers`` и vLLM (кеш HF): сначала по папке снимка в кеше, иначе
-    по конфигу модели (``_commit_hash``); None — не удалось ни так, ни так."""
-    try:
-        from huggingface_hub import snapshot_download
+    """Хеш коммита модели: ревизия, если это уже хеш (закреплена в конфиге), иначе — куда указывает ссылка ревизии
+    в кеше HF (``refs/<ревизия>``; тот же снимок читают ``transformers`` и vLLM); None — ссылки нет."""
+    import re
 
-        return Path(snapshot_download(model_id, revision=revision, local_files_only=True)).name
-    except Exception:
-        pass
+    if re.fullmatch(r"[0-9a-f]{40}", revision):
+        return revision
     try:
-        from transformers import AutoConfig
+        from huggingface_hub import constants
 
-        return getattr(AutoConfig.from_pretrained(model_id, revision=revision), "_commit_hash", None)
+        ref = Path(constants.HF_HUB_CACHE) / ("models--" + model_id.replace("/", "--")) / "refs" / revision
+        return ref.read_text(encoding="utf-8").strip() or None
     except Exception:
         return None
 

@@ -3,7 +3,7 @@ algorithm: grpo
 implemented: true
 runs_dir: runs/grpo
 policy_model: t-tech/T-lite-it-2.1         # старт и опорная — исходная T-lite (decisions.md, раздел 9, 13.11.2026)
-policy_revision: main                      # хеш коммита из кеша HF — в манифесте запуска
+policy_revision: d125c970c553de58fcee3c937d5e4867d4a448d8  # закреплена 13.11.2026 (main в кеше сервера); vLLM — с тем же --revision
 vllm_url: http://127.0.0.1:8000
 vllm_base_name: base                       # --served-model-name исходной модели на сервере vLLM
 wiki_snapshot: data/sources/wiki_cache     # снимок кеша: копируется в папку каждого запуска
@@ -39,7 +39,7 @@ val_samples: 2
 keep_states: 2
 # контроль
 kl_old_new_episodes: 4
-max_logprob_mismatch: {mean_abs: null, p99: null}   # задаётся по пилоту (checks.logprob_check)
+max_logprob_mismatch: {mean_abs: 0.012, p99: 0.09}  # 3 × максимум проверки и пилота EXP-022 (0,0040 и 0,030)
 max_skipped_updates: 0.05
 embedder_device: cuda:1
 seed: 0
