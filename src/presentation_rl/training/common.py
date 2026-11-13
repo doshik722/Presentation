@@ -72,6 +72,7 @@ class RLConfig:
     std_floor: float = 0.02
     # validation и сохранение
     eval_every: int = 10
+    save_every: int = 5  # полное состояние для продолжения (решение 13.11.2026; validation — по eval_every)
     val_topics: int = 8
     val_samples: int = 2
     keep_states: int = 2

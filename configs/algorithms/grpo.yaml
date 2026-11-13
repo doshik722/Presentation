@@ -34,6 +34,7 @@ clip_eps: 0.2                              # при μ = 1 не срабатыв
 std_floor: 0.02
 # validation и сохранение
 eval_every: 10
+save_every: 5                              # полное состояние для продолжения после сбоя (13.11.2026)
 val_topics: 8
 val_samples: 2
 keep_states: 2

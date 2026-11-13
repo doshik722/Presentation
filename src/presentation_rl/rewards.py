@@ -279,18 +279,36 @@ class SentenceEmbedder:
         self.model = SentenceTransformer(name, device=device)
         self.prefixes = name.lower().find("e5") >= 0
         self.batch_size = batch_size
+        self.oom_retries = 0  # повторы меньшими пачками после нехватки памяти карты (журнал RL)
         self._cache: dict[tuple[str, str], np.ndarray] = {}
 
     def encode(self, texts: Sequence[str], kind: str) -> np.ndarray:
         missing = [t for t in dict.fromkeys(texts) if (kind, t) not in self._cache]
         if missing:
             inputs = [f"{kind}: {t}" if self.prefixes else t for t in missing]
-            vectors = self.model.encode(inputs, batch_size=self.batch_size, normalize_embeddings=True)
+            vectors = self._encode(inputs)
             for text, vector in zip(missing, vectors):
                 self._cache[(kind, text)] = np.asarray(vector, dtype=np.float32)
         if not texts:
             return np.zeros((0, 1), dtype=np.float32)
         return np.stack([self._cache[(kind, t)] for t in texts])
+
+    def _encode(self, inputs: list[str]) -> np.ndarray:
+        """Пачками ``batch_size``; при нехватке памяти карты — освободить кеш PyTorch и повторить пачками в 4 раза
+        меньше, до 2 текстов, дальше — ошибка (решение 13.11.2026: в RL на той же карте vLLM, и его память со временем
+        растёт). Результат тот же: тексты кодируются независимо, меняется только размер пачки."""
+        import torch
+
+        batch = self.batch_size
+        while True:
+            try:
+                return self.model.encode(inputs, batch_size=batch, normalize_embeddings=True)
+            except torch.cuda.OutOfMemoryError:
+                if batch <= 2:
+                    raise
+                torch.cuda.empty_cache()
+                batch = max(2, batch // 4)
+                self.oom_retries += 1
 
 
 def pairwise_cosine(embedder: Embedder, left: list[str], right: list[str]) -> np.ndarray:

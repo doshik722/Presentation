@@ -3,7 +3,7 @@
 
 Шаг: 8 заданий (4 с поиском, 4 без) × 8 эпизодов → награда → преимущество (среднее группы, разброс шага с нижней
 границей) → loss по токенам модели с k2-регуляризацией к опорной модели → одно обновление → новый адаптер в vLLM.
-Каждые 10 шагов: архив адаптера, 32 эпизода validation, полное состояние для продолжения.
+Каждые 10 шагов: архив адаптера и 32 эпизода validation; каждые 5 — полное состояние для продолжения.
 
 Запуск — ``notebooks/grpo.ipynb``; продолжение после сбоя — ``train(config, root, run_dir=<папка запуска>)``.
 """
@@ -341,6 +341,7 @@ def train(config: RLConfig, root: str | Path = ".", run_dir: str | Path | None =
                 "seconds": {"generation": generated - began, "reward": rewarded - generated, "train": trained - rewarded,
                             "adapter": published - trained, "network": cache.network_seconds - network_before},
                 "counters": dict(counters), "queue": queue.state(),
+                "embedder_oom_retries": getattr(getattr(reward, "embedder", None), "oom_retries", None),
             })
             if counters["skipped"] > config.max_skipped_updates * step:
                 journals["events"].write({"type": "warning", "step": step,
@@ -357,6 +358,7 @@ def train(config: RLConfig, root: str | Path = ".", run_dir: str | Path | None =
                 journals["validation"].write({"step": step, **summarize(val)})
                 write_json(folder / "done.json", {"step": step, "session": session,
                                                   "time": time.strftime("%Y-%m-%dT%H:%M:%S")})
+            if step % config.save_every == 0 or step % config.eval_every == 0 or step == config.steps:
                 save_state(run_dir, step, model, optimizer, scaler, queue, counters, config.keep_states)
     except BaseException as error:
         journals["events"].write({"type": "stopped", "at_step": step, "error": repr(error)[:2000]})

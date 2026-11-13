@@ -382,6 +382,25 @@ def test_direct_penalties_replace_visual_sum():
     assert direct.total - before.total == pytest.approx(w.visual * (direct.visual - before.visual) - 0.1)
 
 
+def test_embedder_retries_smaller_batches_after_out_of_memory():
+    torch = pytest.importorskip("torch")
+    from presentation_rl.rewards import SentenceEmbedder
+
+    calls = []
+
+    class Model:
+        def encode(self, inputs, batch_size, normalize_embeddings):
+            calls.append(batch_size)
+            if batch_size > 8:
+                raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+            return np.ones((len(inputs), 3), dtype=np.float32)
+
+    embedder = SentenceEmbedder.__new__(SentenceEmbedder)
+    embedder.model, embedder.prefixes, embedder.batch_size, embedder.oom_retries, embedder._cache = Model(), False, 32, 0, {}
+    assert embedder.encode(["а", "б"], "passage").shape == (2, 3)
+    assert calls == [32, 8] and embedder.oom_retries == 1
+
+
 def test_visual_relevance_threshold_duplicates_and_unverified_kinds():
     deck = deck_of(["#TITLE: Кот", "#TEXT: кот и собака", "#IMAGE: кот спит", "#IMAGE: кот спит"],
                    ["#TITLE: Мотор", "#TEXT: кот и собака", "#IMAGE: двигатель",
