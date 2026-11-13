@@ -218,6 +218,23 @@ def generate_reference(config: RLConfig, root: str | Path = ".", client=None, re
     return folder
 
 
+def fmt(value, digits: int = 2) -> str:
+    return "—" if value is None else f"{value:.{digits}f}"
+
+
+def progress(step: int, seconds: float, stats: dict, rollouts: list[Rollout], counters: dict, config: RLConfig) -> None:
+    """Строка хода обучения в вывод ячейки (журналы — на диске; кривые в той же тетрадке во время обучения
+    не запустить)."""
+    summary = summarize(rollouts)
+    done = counters["updates"] + counters["skipped"]
+    left = (config.steps - step) * counters["seconds"] / max(1, done) / 3600
+    stopped = sum(r.finish != "stop" for r in rollouts)
+    print(f"шаг {step}/{config.steps} · {seconds / 60:.1f} мин · награда: поиск {fmt(summary.get('search_reward'))}, "
+          f"без {fmt(summary.get('plain_reward'))} · KL {stats['kl_ref_k3']:.1e} · оборваны {stopped}/{len(rollouts)} · "
+          f"log p |Δ| {fmt(stats['logprob_mismatch'].get('mean_abs'), 4)} · пик {fmt(stats['peak_memory_gb'], 1)} ГБ · "
+          f"осталось ≈ {left:.1f} ч", flush=True)
+
+
 def wiki_contact() -> str:
     return os.environ.get("WIKI_CONTACT", "https://github.com/doshik722")
 
@@ -304,6 +321,7 @@ def train(config: RLConfig, root: str | Path = ".", run_dir: str | Path | None =
             client.unload_lora(name)
     current = publish(start, None)
     journals["events"].write({"type": "start", "step": start, "run": run_dir.name})
+    print(f"запуск {run_dir.name}, сессия {session}, с шага {start + 1} до {config.steps}", flush=True)
     step = start
     try:
         for step in range(start + 1, config.steps + 1):
@@ -343,6 +361,7 @@ def train(config: RLConfig, root: str | Path = ".", run_dir: str | Path | None =
                 "counters": dict(counters), "queue": queue.state(),
                 "embedder_oom_retries": getattr(getattr(reward, "embedder", None), "oom_retries", None),
             })
+            progress(step, published - began, stats, rollouts, counters, config)
             if counters["skipped"] > config.max_skipped_updates * step:
                 journals["events"].write({"type": "warning", "step": step,
                                           "message": f"пропущено обновлений {counters['skipped']} из {step}"})
@@ -355,7 +374,12 @@ def train(config: RLConfig, root: str | Path = ".", run_dir: str | Path | None =
                 shutil.copytree(adapters / f"step_{step:04d}", folder / "adapter")
                 val = validate(client, current, all_tasks, val_topics, config.val_samples, tokenizer, cache, reward,
                                config, folder / "validation")
-                journals["validation"].write({"step": step, **summarize(val)})
+                summary = summarize(val)
+                journals["validation"].write({"step": step, **summary})
+                print(f"  validation, шаг {step}: награда поиск {fmt(summary.get('search_reward'))}, "
+                      f"без {fmt(summary.get('plain_reward'))}; в диапазоне слайдов "
+                      f"{fmt(summary.get('plain_in_range_explicit'))}; с заключением "
+                      f"{fmt(summary.get('plain_with_conclusion'))}", flush=True)
                 write_json(folder / "done.json", {"step": step, "session": session,
                                                   "time": time.strftime("%Y-%m-%dT%H:%M:%S")})
             if step % config.save_every == 0 or step % config.eval_every == 0 or step == config.steps:
