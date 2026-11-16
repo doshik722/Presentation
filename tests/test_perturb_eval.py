@@ -3,7 +3,7 @@ import json
 
 from presentation_rl.perturb import generate
 from presentation_rl.dsl import parse
-from presentation_rl.perturb_eval import (COVERAGE_VARIANTS, EXP016_VARIANTS, SOURCE_VARIANTS, VARIANTS, Config, Item, Rules, ablation_configs, ablation_rows, author_answers,
+from presentation_rl.perturb_eval import (COVERAGE_VARIANTS, EXP016_VARIANTS, RERANKER_VARIANTS, SOURCE_VARIANTS, VARIANTS, Config, Item, Rules, ablation_configs, ablation_rows, author_answers,
                                           build_all, calibrate_tau, check_pairs, choose, conflict_rows, edge,
                                           evaluate_pairs, family_shares, load_conflicts, load_foreign, nested_cv,
                                           calibrate_coverage, generic_variants, score_items, signed, source_variants,
@@ -11,7 +11,7 @@ from presentation_rl.perturb_eval import (COVERAGE_VARIANTS, EXP016_VARIANTS, SO
 from presentation_rl.rewards import Lemmatizer
 
 from test_perturb import ANNOTATION, CONTEXT, DONOR, ORIGINAL, POINTS
-from test_rewards import FakeAnalyzer, FakeEmbedder, GrammemeAnalyzer
+from test_rewards import FakeAnalyzer, FakeEmbedder, FakeReranker, GrammemeAnalyzer
 
 
 def test_verdicts_use_margins():
@@ -196,4 +196,19 @@ def test_generic_body_keeps_title_and_replaces_content():
     share = score_items(items, {"t1": POINTS}, Config("fake", 0.2, 1.0, 0.5, "cov_share"), embedder, lemmatizer,
                         scale=scale)
     assert share[("t1", "original")]["coverage"] in {0.0, 0.25, 0.5, 0.75, 1.0}  # доля раскрытых из 4 тезисов
+
+
+def test_reranker_variants_score_and_calibrate():
+    result = generate("t1", ORIGINAL, ANNOTATION, POINTS, CONTEXT, DONOR)
+    items = {("t1", vid): Item(("t1", vid), "t1", v["text"], {**CONTEXT, **v["context"]})
+             for vid, v in result.variants.items()}
+    build_all(items, log=lambda _: None)
+    lemmatizer, embedder, reranker = Lemmatizer(GrammemeAnalyzer()), FakeEmbedder(), FakeReranker()
+    for v in RERANKER_VARIANTS:
+        scores = score_items(items, {"t1": POINTS}, Config("fake", 0.2, 1.0, 0.5, v), embedder, lemmatizer,
+                             reranker=reranker)
+        assert 0.0 <= scores[("t1", "original")]["coverage"] <= 1.0
+    scale, rows = calibrate_coverage(items, {"t1": ANNOTATION}, {"t1": POINTS}, embedder, lemmatizer,
+                                     Config("fake", 0.2, 1.0, 0.5, "rr").weights(), reranker=reranker)
+    assert len(rows) == 3 and all(0.0 <= r["own"] <= 1.0 for r in rows)
 

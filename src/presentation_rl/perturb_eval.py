@@ -90,6 +90,37 @@ class CachedEmbedder:
         self.added = 0
 
 
+class CachedReranker:
+    """Кросс-энкодер с кешем оценок на диске (как ``CachedEmbedder``): ключ файла — модель, ревизия, длина."""
+
+    def __init__(self, name: str, cache_dir: str | Path, device: str | None = None, batch_size: int = 32,
+                 max_length: int = 512):
+        from .rewards import CrossEncoderReranker
+
+        self.inner = CrossEncoderReranker(name, device=device, batch_size=batch_size, max_length=max_length)
+        self.signature = {"model": name, "revision": _snapshot(name), "max_length": max_length, "sigmoid": True}
+        digest = hashlib.sha1(json.dumps(self.signature, sort_keys=True).encode()).hexdigest()[:12]
+        self.path = Path(cache_dir) / f"rerank_{name.replace('/', '__')}_{digest}.json"
+        self.added = 0
+        if self.path.exists():
+            saved = json.loads(self.path.read_text(encoding="utf-8"))
+            self.inner._cache.update({(q, p): v for q, p, v in saved})
+
+    def score(self, pairs):
+        before = len(self.inner._cache)
+        values = self.inner.score(pairs)
+        self.added += len(self.inner._cache) - before
+        return values
+
+    def save(self) -> None:
+        if not self.added:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        rows = [[q, p, v] for (q, p), v in self.inner._cache.items()]
+        self.path.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+        self.added = 0
+
+
 def _snapshot(name: str) -> str:
     """Коммит локальной копии модели с Hugging Face; «unknown», если узнать нельзя."""
     try:
@@ -280,12 +311,19 @@ VARIANTS: dict[str, dict] = {
     "cov_scale_cap2": {"coverage_scale": True, "coverage_capacity": 2},
     "cov_share": {"coverage_scale": True, "coverage_binary": True},
     "cov_share_cap2": {"coverage_scale": True, "coverage_binary": True, "coverage_capacity": 2},
+    # кросс-энкодер вместо косинуса (EXP-025); rr_share — доля тезисов с вероятностью не меньше 0,5
+    "rr": {"coverage_reranker": True},
+    "rr_cap2": {"coverage_reranker": True, "coverage_capacity": 2},
+    "rr_share": {"coverage_reranker": True, "coverage_scale": (0.0, 1.0), "coverage_binary": True},
+    "rr_share_cap2": {"coverage_reranker": True, "coverage_scale": (0.0, 1.0), "coverage_binary": True,
+                      "coverage_capacity": 2},
     "src_any": {"source_bonus": 0.1, "source_facts": False},
     "src_facts": {"source_bonus": 0.1, "source_facts": True},
 }
 EXP016_VARIANTS = ("base", "relative", "keys_gate", "units", "contradiction", "direct", "visual_link", "all", "accepted")
 COVERAGE_VARIANTS = ("cov_scale", "cov_cap2", "cov_scale_cap2", "cov_share", "cov_share_cap2", "cov_cap1")  # порядок — от простого
 SOURCE_VARIANTS = ("src_any", "src_facts")
+RERANKER_VARIANTS = ("rr", "rr_cap2", "rr_share", "rr_share_cap2")  # порядок — от простого
 UNITS_VARIANTS = frozenset({"units", "all", "accepted"})
 
 
@@ -345,7 +383,7 @@ def _with_units(lemmatizer: Lemmatizer, units: bool) -> Lemmatizer:
 def score_items(items: dict[tuple, Item], points: dict[str, list[KeyPoint]], config: Config, embedder,
                 lemmatizer, foreign: Sequence[Sequence[SlideText]] | None = None,
                 tau: dict[str, float] | None = None,
-                scale: tuple[float, float] | None = None) -> dict[tuple, dict[str, float]]:
+                scale: tuple[float, float] | None = None, reranker=None) -> dict[tuple, dict[str, float]]:
     """Компоненты награды (со знаком «как в награде») для каждой презентации при конфигурации ``config``.
     ``foreign`` — чужие презентации для фона тезисов (нужны вариантам с ``relative``/``keys_gate``),
     ``tau`` — пороги связи визуала со слайдом (вариантам с ``visual_tau``)."""
@@ -369,7 +407,7 @@ def score_items(items: dict[tuple, Item], points: dict[str, list[KeyPoint]], con
         r = score(item.deck, points[item.task], conclusion=c["conclusion"], slide_range=slide_range,
                   embedder=embedder, lemmatizer=lemmatizer, report=item.report, images_allowed=c["images_allowed"],
                   tool_text=c.get("tool_text"), calls=c.get("calls"), search=c["search"], weights=weights,
-                  backgrounds=background)
+                  backgrounds=background, reranker=reranker)
         result[key] = signed(r.components())
     return result
 
@@ -432,7 +470,7 @@ def calibrate_tau(decks: dict[str, object], domains: dict[str, str], embedder, s
 
 def calibrate_coverage(items: dict[tuple, Item], annotations: dict[str, dict], points: dict[str, list[KeyPoint]],
                        embedder, lemmatizer, weights: RewardWeights | None = None, lo_q: float = 0.5,
-                       hi_q: float = 0.25) -> tuple[tuple[float, float], list[dict]]:
+                       hi_q: float = 0.25, reranker=None) -> tuple[tuple[float, float], list[dict]]:
     """Шкала покрытия v2 по размеченным исходникам (EXP-024, правило до прогона). Для каждого содержательного
     тезиса: «свой» — лучшее сходство с его размеченными слайдами, «чужой» — лучшее сходство с остальными слайдами
     той же презентации (то, что останется, если слайд тезиса убрать). lo — квантиль ``lo_q`` «чужих», hi —
@@ -449,7 +487,7 @@ def calibrate_coverage(items: dict[tuple, Item], annotations: dict[str, dict], p
         has_conclusion = item.context["conclusion"] and len(pts) > 1
         n = len(texts)
         pool = list(range(n - 1)) if has_conclusion and n > 1 else list(range(n))
-        sim = similarity_matrix(pts, texts, embedder, lemmatizer, weights)
+        sim = similarity_matrix(pts, texts, embedder, lemmatizer, weights, reranker)
         for i, marked in enumerate(ann["theses"]):
             if has_conclusion and i == len(pts) - 1:
                 continue

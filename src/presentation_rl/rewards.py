@@ -270,6 +270,39 @@ class Embedder(Protocol):
         """Строки — нормированные векторы; ``kind`` — ``query`` (тезисы) или ``passage`` (слайды)."""
 
 
+class CrossEncoderReranker:
+    """Кросс-энкодер «тезис — слайд» (EXP-025): вероятность того, что слайд отвечает на тезис (сигмоида логита).
+    В отличие от эмбеддера, читает пару вместе, поэтому должен лучше отличать «про этот тезис» от «по теме»."""
+
+    def __init__(self, name: str = "BAAI/bge-reranker-v2-m3", device: str | None = None, batch_size: int = 32,
+                 max_length: int = 512):
+        from sentence_transformers import CrossEncoder  # группа зависимостей reward
+
+        self.model = CrossEncoder(name, device=device, max_length=max_length)
+        self.batch_size = batch_size
+        self._cache: dict[tuple[str, str], float] = {}
+
+    def _logits(self, pairs: list[tuple[str, str]]) -> np.ndarray:
+        import inspect
+
+        import torch
+
+        params = inspect.signature(self.model.predict).parameters
+        name = next((n for n in ("activation_fn", "activation_fct") if n in params), None)
+        if name is None:
+            raise RuntimeError("CrossEncoder.predict без параметра активации: не получить логиты")
+        out = self.model.predict(pairs, batch_size=self.batch_size, show_progress_bar=False,
+                                 **{name: torch.nn.Identity()})
+        return np.asarray(out, dtype=np.float32).reshape(-1)
+
+    def score(self, pairs: Sequence[tuple[str, str]]) -> np.ndarray:
+        missing = [p for p in dict.fromkeys(pairs) if p not in self._cache]
+        if missing:
+            probs = 1.0 / (1.0 + np.exp(-self._logits(missing)))
+            self._cache.update(zip(missing, map(float, probs)))
+        return np.array([self._cache[p] for p in pairs], dtype=np.float32)
+
+
 class SentenceEmbedder:
     """Эмбеддер на sentence-transformers. Для e5 добавляет префиксы ``query:``/``passage:``."""
 
@@ -570,6 +603,7 @@ class RewardWeights:
     coverage_scale: tuple[float, float] | None = None  # (lo, hi): сходство тезиса → clip((s − lo)/(hi − lo), 0, 1)
     coverage_capacity: int | None = None  # не больше стольких тезисов на один слайд; None — лучший слайд каждому
     coverage_binary: bool = False  # при coverage_scale: тезис раскрыт (1) или нет (0) по середине шкалы — доля раскрытых
+    coverage_reranker: bool = False  # сходство тезиса и слайда — кросс-энкодер (score(reranker=...)), а не косинус
     source_bonus: float = 0.0  # × доля слайдов с верной #SOURCE (только «Поиск: есть»)
     source_facts: bool = True  # слайд засчитывается, только если хоть одно его число или имя есть в выдаче
 
@@ -623,7 +657,13 @@ class RewardResult:
 
 
 def similarity_matrix(points: Sequence[KeyPoint], texts: Sequence[SlideText], embedder: Embedder,
-                      lemmatizer: Lemmatizer | None, weights: RewardWeights) -> np.ndarray:
+                      lemmatizer: Lemmatizer | None, weights: RewardWeights, reranker=None) -> np.ndarray:
+    if weights.coverage_reranker:  # EXP-025: тезис (заголовок и утверждение) и слайд целиком читаются вместе
+        if reranker is None:
+            raise ValueError("для coverage_reranker нужен кросс-энкодер (score(reranker=...))")
+        queries = [f"{p.title}. {p.statement}" for p in points]
+        values = reranker.score([(q, t.full) for q in queries for t in texts])
+        return np.asarray(values, dtype=np.float32).reshape(len(points), len(texts))
     titles = _cosine(embedder, [p.title for p in points], [t.title for t in texts])
     statements = _cosine(embedder, [p.statement for p in points], [t.content for t in texts])
     if weights.alpha and lemmatizer is not None:
@@ -655,7 +695,8 @@ def thesis_backgrounds(points: Sequence[KeyPoint], foreign: Sequence[Sequence[Sl
 def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_range: tuple[int, int] | None,
           embedder: Embedder, lemmatizer: Lemmatizer, report=None, images_allowed: bool = True,
           tool_text: str | None = None, calls: Sequence[dict] | None = None, search: bool = True,
-          weights: RewardWeights | None = None, backgrounds: Sequence[float] | None = None) -> RewardResult:
+          weights: RewardWeights | None = None, backgrounds: Sequence[float] | None = None,
+          reranker=None) -> RewardResult:
     """Награда за разобранную презентацию по тезисам темы.
 
     ``conclusion`` — последний тезис является заключением (``key_points.expected_theses(task)[2]``);
@@ -685,7 +726,7 @@ def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_ran
 
     theses: list[ThesisResult] = []
     if n and points:
-        sim = similarity_matrix(points, texts, embedder, lemmatizer, weights)
+        sim = similarity_matrix(points, texts, embedder, lemmatizer, weights, reranker)
         slide_tokens = [lemmatizer.tokens(t.full) for t in texts]
         slide_lemmas = [[lemma for lemma, _ in tokens] for tokens in slide_tokens]
         slide_pairs = [number_units(tokens) for tokens in slide_tokens]

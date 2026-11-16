@@ -475,3 +475,28 @@ def test_source_bonus_counts_valid_sources_with_facts_from_tool_text():
     assert off.sources == 0 and on.sources == pytest.approx(1 / 3)
     assert on.total - off.total == pytest.approx(0.1 / 3) and plain.sources == 0
 
+
+class FakeReranker:
+    """Вероятность «слайд отвечает на тезис» — доля общих начальных форм от числа слов тезиса."""
+
+    def score(self, pairs):
+        out = []
+        for query, passage in pairs:
+            q, p = LEM.content_lemmas(query), LEM.content_lemmas(passage)
+            out.append(len(q & p) / max(1, len(q)))
+        return np.array(out, dtype=np.float32)
+
+
+def test_reranker_replaces_cosine_and_share_counts_theses_over_half():
+    deck = deck_of(["#TITLE: Матрица", "#TEXT: матрица определитель"], ["#TITLE: Спуск", "#TEXT: градиентный спуск"])
+    points = [KeyPoint("Матрица", "матрица определитель", []), KeyPoint("Спуск", "градиентный спуск", []),
+              KeyPoint("Лед", "лед", [])]
+    kwargs = dict(conclusion=False, slide_range=None, embedder=EMB, lemmatizer=LEM)
+    with pytest.raises(ValueError):
+        score(deck, points, weights=RewardWeights(coverage_reranker=True), **kwargs)
+    rr = score(deck, points, weights=RewardWeights(coverage_reranker=True), reranker=FakeReranker(), **kwargs)
+    assert [t.similarity for t in rr.theses] == pytest.approx([1.0, 1.0, 0.0])
+    share = score(deck, points, weights=RewardWeights(coverage_reranker=True, coverage_scale=(0.0, 1.0),
+                                                      coverage_binary=True), reranker=FakeReranker(), **kwargs)
+    assert share.coverage == pytest.approx(2 / 3) and share.uncovered == 1
+
