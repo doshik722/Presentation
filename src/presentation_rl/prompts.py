@@ -228,9 +228,17 @@ _NO_IMAGES = [
 ]
 
 
-def system_prompt(request: PresentationRequest) -> str:
+# EXP-027 (16.11.2026): вариант промпта с правилом «слайд — законченная мысль с конкретикой» — против слайдов, которые
+# только называют тему или перечисляют термины. По умолчанию выключен: им обучены SFT и GRPO (EXP-023).
+SPECIFIC_ANCHOR = "  однородные пункты — `#BULLET`.\n"
+SPECIFIC_RULE = ("- Каждый содержательный слайд — одна законченная мысль: заголовок её называет, текст раскрывает конкретно —\n"
+                 "  определение, механизм, причина и следствие, факт с числом, именем или датой. Слайд, который только\n"
+                 "  называет тему или перечисляет термины без объяснения, не нужен.\n")
+
+
+def system_prompt(request: PresentationRequest, specific: bool = False) -> str:
     """Системный промпт для запроса. С поиском — два этапа, вызов в формате и пример с поиском; без поиска — о поиске
-    ни слова. Без картинок — о картинках ни слова."""
+    ни слова. Без картинок — о картинках ни слова. ``specific`` — правило EXP-027 после правила об объёме текста."""
     if request.search:
         text = (INTRO_SEARCH + "\n## Как выполнять запрос\n\n" + FIRST_RULE_SEARCH + RULES + "\n## Формат\n\n" + CALLS
                 + FORMAT + SLIDES + SEARCH + EXAMPLE_SEARCH)
@@ -240,4 +248,7 @@ def system_prompt(request: PresentationRequest) -> str:
         for old, new in _NO_IMAGES:
             assert old in text, f"в промпте нет «{old[:50]}»: обнови _NO_IMAGES"
             text = text.replace(old, new)
+    if specific:
+        assert text.count(SPECIFIC_ANCHOR) == 1, "в промпте нет правила об объёме текста: обнови SPECIFIC_ANCHOR"
+        text = text.replace(SPECIFIC_ANCHOR, SPECIFIC_ANCHOR + SPECIFIC_RULE)
     return text

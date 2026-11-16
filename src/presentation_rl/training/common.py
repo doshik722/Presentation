@@ -249,11 +249,12 @@ def collect(jobs: list[Job], tokenizer, prompt: Callable, make_generate: Callabl
         return list(pool.map(one, zip(jobs, prompts)))
 
 
-def episode_prompt(tokenizer) -> Callable:
+def episode_prompt(tokenizer, specific: bool = False) -> Callable:
+    """``specific`` — вариант промпта EXP-027 (``prompts.SPECIFIC_RULE``); по умолчанию — основной промпт."""
     from ..prompts import system_prompt
 
     def prompt(request):
-        return build_prompt(tokenizer, system_prompt(request), request)
+        return build_prompt(tokenizer, system_prompt(request, specific=specific), request)
 
     return prompt
 

@@ -2,7 +2,7 @@
 import re
 
 from presentation_rl.dsl import parse
-from presentation_rl.prompts import system_prompt
+from presentation_rl.prompts import SPECIFIC_RULE, system_prompt
 from presentation_rl.tasks import PresentationRequest
 
 WITH_SEARCH = system_prompt(PresentationRequest("Фотоэффект"))
@@ -43,3 +43,13 @@ def test_no_images_mode_does_not_mention_images():
         example = without[without.index("## Пример"):]
         lines = [line for line in example.splitlines() if line.startswith("#") and not line.startswith("##")]
         assert parse("\n".join(lines)).errors == []
+
+
+def test_specific_rule_is_optional_and_follows_text_volume_rule():
+    for search in (True, False):
+        for images in (True, False):
+            request = PresentationRequest("Фотоэффект", search=search, images=images)
+            plain, specific = system_prompt(request), system_prompt(request, specific=True)
+            assert SPECIFIC_RULE not in plain and specific.count(SPECIFIC_RULE) == 1
+            assert specific.replace(SPECIFIC_RULE, "") == plain  # больше ничего не меняется
+            assert specific.index("однородные пункты") < specific.index(SPECIFIC_RULE) < specific.index("визуальный элемент")
