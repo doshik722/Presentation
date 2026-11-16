@@ -604,6 +604,7 @@ class RewardWeights:
     coverage_capacity: int | None = None  # не больше стольких тезисов на один слайд; None — лучший слайд каждому
     coverage_binary: bool = False  # при coverage_scale: тезис раскрыт (1) или нет (0) по середине шкалы — доля раскрытых
     coverage_reranker: bool = False  # сходство тезиса и слайда — кросс-энкодер (score(reranker=...)), а не косинус
+    reranker_body: bool = False  # EXP-026: запрос — утверждение тезиса, документ — содержимое слайда без заголовка
     source_bonus: float = 0.0  # × доля слайдов с верной #SOURCE (только «Поиск: есть»)
     source_facts: bool = True  # слайд засчитывается, только если хоть одно его число или имя есть в выдаче
 
@@ -661,9 +662,18 @@ def similarity_matrix(points: Sequence[KeyPoint], texts: Sequence[SlideText], em
     if weights.coverage_reranker:  # EXP-025: тезис (заголовок и утверждение) и слайд целиком читаются вместе
         if reranker is None:
             raise ValueError("для coverage_reranker нужен кросс-энкодер (score(reranker=...))")
-        queries = [f"{p.title}. {p.statement}" for p in points]
-        values = reranker.score([(q, t.full) for q in queries for t in texts])
-        return np.asarray(values, dtype=np.float32).reshape(len(points), len(texts))
+        if weights.reranker_body:  # EXP-026: без заголовков — слайд с одним заголовком тезиса не раскрывает
+            queries = [p.statement for p in points]
+            passages = [t.content for t in texts]
+        else:
+            queries = [f"{p.title}. {p.statement}" for p in points]
+            passages = [t.full for t in texts]
+        values = np.zeros((len(points), len(texts)), dtype=np.float32)
+        filled = [j for j, passage in enumerate(passages) if passage.strip()]  # пустой слайд — 0 без вызова
+        if filled and points:
+            scored = reranker.score([(q, passages[j]) for q in queries for j in filled])
+            values[:, filled] = np.asarray(scored, dtype=np.float32).reshape(len(points), len(filled))
+        return values
     titles = _cosine(embedder, [p.title for p in points], [t.title for t in texts])
     statements = _cosine(embedder, [p.statement for p in points], [t.content for t in texts])
     if weights.alpha and lemmatizer is not None:

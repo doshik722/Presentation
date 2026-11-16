@@ -317,6 +317,9 @@ VARIANTS: dict[str, dict] = {
     "rr_share": {"coverage_reranker": True, "coverage_scale": (0.0, 1.0), "coverage_binary": True},
     "rr_share_cap2": {"coverage_reranker": True, "coverage_scale": (0.0, 1.0), "coverage_binary": True,
                       "coverage_capacity": 2},
+    # кросс-энкодер без заголовков (EXP-026): запрос — утверждение тезиса, документ — содержимое слайда
+    "rrb": {"coverage_reranker": True, "reranker_body": True},
+    "rrb_share": {"coverage_reranker": True, "reranker_body": True, "coverage_scale": (0.0, 1.0), "coverage_binary": True},
     "src_any": {"source_bonus": 0.1, "source_facts": False},
     "src_facts": {"source_bonus": 0.1, "source_facts": True},
 }
@@ -324,6 +327,7 @@ EXP016_VARIANTS = ("base", "relative", "keys_gate", "units", "contradiction", "d
 COVERAGE_VARIANTS = ("cov_scale", "cov_cap2", "cov_scale_cap2", "cov_share", "cov_share_cap2", "cov_cap1")  # порядок — от простого
 SOURCE_VARIANTS = ("src_any", "src_facts")
 RERANKER_VARIANTS = ("rr", "rr_cap2", "rr_share", "rr_share_cap2")  # порядок — от простого
+BODY_VARIANTS = ("rrb", "rrb_share")  # порядок — от простого
 UNITS_VARIANTS = frozenset({"units", "all", "accepted"})
 
 
@@ -501,9 +505,10 @@ def calibrate_coverage(items: dict[tuple, Item], annotations: dict[str, dict], p
     lo, hi = float(np.quantile(other, lo_q)), float(np.quantile(own, hi_q))
     if hi <= lo + 0.01:
         hi = float(np.median(own))
+    span = max(1e-6, hi - lo)  # своё и чужое могут совпасть (например, все вероятности кросс-энкодера — 0)
     for r in rows:
-        r.update(lo=lo, hi=hi, own_scaled=min(1.0, max(0.0, (r["own"] - lo) / (hi - lo))),
-                 other_scaled=min(1.0, max(0.0, (r["other"] - lo) / (hi - lo))))
+        r.update(lo=lo, hi=hi, own_scaled=min(1.0, max(0.0, (r["own"] - lo) / span)),
+                 other_scaled=min(1.0, max(0.0, (r["other"] - lo) / span)))
     return (lo, hi), rows
 
 

@@ -3,7 +3,7 @@ import json
 
 from presentation_rl.perturb import generate
 from presentation_rl.dsl import parse
-from presentation_rl.perturb_eval import (COVERAGE_VARIANTS, EXP016_VARIANTS, RERANKER_VARIANTS, SOURCE_VARIANTS, VARIANTS, Config, Item, Rules, ablation_configs, ablation_rows, author_answers,
+from presentation_rl.perturb_eval import (BODY_VARIANTS, COVERAGE_VARIANTS, EXP016_VARIANTS, RERANKER_VARIANTS, SOURCE_VARIANTS, VARIANTS, Config, Item, Rules, ablation_configs, ablation_rows, author_answers,
                                           build_all, calibrate_tau, check_pairs, choose, conflict_rows, edge,
                                           evaluate_pairs, family_shares, load_conflicts, load_foreign, nested_cv,
                                           calibrate_coverage, generic_variants, score_items, signed, source_variants,
@@ -204,7 +204,7 @@ def test_reranker_variants_score_and_calibrate():
              for vid, v in result.variants.items()}
     build_all(items, log=lambda _: None)
     lemmatizer, embedder, reranker = Lemmatizer(GrammemeAnalyzer()), FakeEmbedder(), FakeReranker()
-    for v in RERANKER_VARIANTS:
+    for v in RERANKER_VARIANTS + BODY_VARIANTS:
         scores = score_items(items, {"t1": POINTS}, Config("fake", 0.2, 1.0, 0.5, v), embedder, lemmatizer,
                              reranker=reranker)
         assert 0.0 <= scores[("t1", "original")]["coverage"] <= 1.0

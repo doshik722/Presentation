@@ -500,3 +500,25 @@ def test_reranker_replaces_cosine_and_share_counts_theses_over_half():
                                                       coverage_binary=True), reranker=FakeReranker(), **kwargs)
     assert share.coverage == pytest.approx(2 / 3) and share.uncovered == 1
 
+
+
+class RecordingReranker(FakeReranker):
+    def __init__(self):
+        self.pairs = []
+
+    def score(self, pairs):
+        self.pairs += list(pairs)
+        return super().score(pairs)
+
+
+def test_reranker_body_ignores_titles_and_scores_empty_slide_zero():
+    deck = deck_of(["#TITLE: Матрица", "#TEXT: матрица определитель"], ["#TITLE: Спуск"])
+    points = [KeyPoint("Матрица", "матрица определитель", []), KeyPoint("Спуск", "градиентный спуск", [])]
+    kwargs = dict(conclusion=False, slide_range=None, embedder=EMB, lemmatizer=LEM)
+    full = score(deck, points, weights=RewardWeights(coverage_reranker=True), reranker=FakeReranker(), **kwargs)
+    assert full.theses[1].similarity == pytest.approx(0.5)  # «Спуск» в запросе и в заголовке слайда
+    rec = RecordingReranker()
+    body = score(deck, points, weights=RewardWeights(coverage_reranker=True, reranker_body=True), reranker=rec, **kwargs)
+    assert [t.similarity for t in body.theses] == pytest.approx([1.0, 0.0])  # слайд из одного заголовка — 0
+    assert {q for q, _ in rec.pairs} == {"матрица определитель", "градиентный спуск"}
+    assert {d for _, d in rec.pairs} == {"матрица определитель"}  # пустой слайд в кросс-энкодер не идёт
