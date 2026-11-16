@@ -29,7 +29,8 @@ from .dsl import parse
 from .key_points import KeyPoint
 from .perturb import task_context
 from .rendering.builder import build_presentation
-from .rewards import (CHECKED_VISUALS, Lemmatizer, RewardWeights, SlideText, pairwise_cosine, score, slide_body,
+from .rewards import (CHECKED_VISUALS, Lemmatizer, RewardWeights, SlideText, pairwise_cosine, score, similarity_matrix,
+                      slide_body,
                       slide_texts, thesis_backgrounds, visual_text)
 
 PENALTIES = frozenset({"length", "forbidden_images", "slide_overflow", "render_errors", "fake_quotes", "bad_sources",
@@ -272,7 +273,19 @@ VARIANTS: dict[str, dict] = {
     "all": {"relative": True, "keys_gate": True, "contradiction": 0.05, "direct_penalties": True, "visual_tau": True,
             "tool_call": 0.02},
     "accepted": {},  # принятая награда — значения по умолчанию RewardWeights (решения 07–08.11.2026)
+    # покрытие v2 и ссылки (EXP-024, 16.11.2026) — поверх принятой; coverage_scale=True — откалиброванные (lo, hi)
+    "cov_cap2": {"coverage_capacity": 2},
+    "cov_cap1": {"coverage_capacity": 1},
+    "cov_scale": {"coverage_scale": True},
+    "cov_scale_cap2": {"coverage_scale": True, "coverage_capacity": 2},
+    "cov_share": {"coverage_scale": True, "coverage_binary": True},
+    "cov_share_cap2": {"coverage_scale": True, "coverage_binary": True, "coverage_capacity": 2},
+    "src_any": {"source_bonus": 0.1, "source_facts": False},
+    "src_facts": {"source_bonus": 0.1, "source_facts": True},
 }
+EXP016_VARIANTS = ("base", "relative", "keys_gate", "units", "contradiction", "direct", "visual_link", "all", "accepted")
+COVERAGE_VARIANTS = ("cov_scale", "cov_cap2", "cov_scale_cap2", "cov_share", "cov_share_cap2", "cov_cap1")  # порядок — от простого
+SOURCE_VARIANTS = ("src_any", "src_facts")
 UNITS_VARIANTS = frozenset({"units", "all", "accepted"})
 
 
@@ -284,8 +297,13 @@ class Config:
     keys: float  # вес ключей при весе покрытия 1
     variant: str = "base"  # вариант награды (VARIANTS)
 
-    def weights(self, base: RewardWeights | None = None, tau: dict[str, float] | None = None) -> RewardWeights:
+    def weights(self, base: RewardWeights | None = None, tau: dict[str, float] | None = None,
+                scale: tuple[float, float] | None = None) -> RewardWeights:
         overrides = dict(VARIANTS[self.variant])
+        if overrides.get("coverage_scale") is True:
+            if scale is None:
+                raise ValueError(f"{self.variant}: нужна шкала покрытия (calibrate_coverage)")
+            overrides["coverage_scale"] = tuple(scale)
         if overrides.get("visual_tau") is True:
             if tau is None:
                 raise ValueError(f"{self.variant}: нужны пороги связи визуала со слайдом (calibrate_tau)")
@@ -309,7 +327,7 @@ def grid(embedders: Sequence[str], alphas: Sequence[float], lengths: Sequence[fl
 
 def ablation_configs(embedder: str, alpha: float, lengths: Sequence[float], keys: Sequence[float]) -> list[Config]:
     """Каждый вариант при текущих λ и весе ключей; для полного варианта — ещё сетка λ × вес ключей."""
-    configs = [Config(embedder, alpha, *CURRENT_WEIGHTS, variant) for variant in VARIANTS]
+    configs = [Config(embedder, alpha, *CURRENT_WEIGHTS, variant) for variant in EXP016_VARIANTS]
     configs += [Config(embedder, alpha, l, k, "all") for l, k in itertools.product(lengths, keys)
                 if (l, k) != CURRENT_WEIGHTS]
     return configs
@@ -326,11 +344,12 @@ def _with_units(lemmatizer: Lemmatizer, units: bool) -> Lemmatizer:
 
 def score_items(items: dict[tuple, Item], points: dict[str, list[KeyPoint]], config: Config, embedder,
                 lemmatizer, foreign: Sequence[Sequence[SlideText]] | None = None,
-                tau: dict[str, float] | None = None) -> dict[tuple, dict[str, float]]:
+                tau: dict[str, float] | None = None,
+                scale: tuple[float, float] | None = None) -> dict[tuple, dict[str, float]]:
     """Компоненты награды (со знаком «как в награде») для каждой презентации при конфигурации ``config``.
     ``foreign`` — чужие презентации для фона тезисов (нужны вариантам с ``relative``/``keys_gate``),
     ``tau`` — пороги связи визуала со слайдом (вариантам с ``visual_tau``)."""
-    weights = config.weights(tau=tau)
+    weights = config.weights(tau=tau, scale=scale)
     lemmatizer = _with_units(lemmatizer, config.units)
     need_background = weights.relative or weights.keys_gate
     if need_background and not foreign:
@@ -409,6 +428,133 @@ def calibrate_tau(decks: dict[str, object], domains: dict[str, str], embedder, s
             tau[kind] = row["tau"]
         report.append(row)
     return tau, report
+
+
+def calibrate_coverage(items: dict[tuple, Item], annotations: dict[str, dict], points: dict[str, list[KeyPoint]],
+                       embedder, lemmatizer, weights: RewardWeights | None = None, lo_q: float = 0.5,
+                       hi_q: float = 0.25) -> tuple[tuple[float, float], list[dict]]:
+    """Шкала покрытия v2 по размеченным исходникам (EXP-024, правило до прогона). Для каждого содержательного
+    тезиса: «свой» — лучшее сходство с его размеченными слайдами, «чужой» — лучшее сходство с остальными слайдами
+    той же презентации (то, что останется, если слайд тезиса убрать). lo — квантиль ``lo_q`` «чужих», hi —
+    квантиль ``hi_q`` «своих»: большинство раскрытых тезисов получают 1, пропущенные — около 0. Если hi не выше lo
+    хотя бы на 0,01, hi — медиана «своих». Отчёт — строки по тезисам."""
+    weights = weights or RewardWeights()
+    rows = []
+    for task, ann in sorted(annotations.items()):
+        item = items.get((task, "original"))
+        if item is None:
+            continue
+        texts = slide_texts(item.deck, item.report)
+        pts = points[task]
+        has_conclusion = item.context["conclusion"] and len(pts) > 1
+        n = len(texts)
+        pool = list(range(n - 1)) if has_conclusion and n > 1 else list(range(n))
+        sim = similarity_matrix(pts, texts, embedder, lemmatizer, weights)
+        for i, marked in enumerate(ann["theses"]):
+            if has_conclusion and i == len(pts) - 1:
+                continue
+            own = [s - 1 for s in marked if 0 < s <= n]
+            other = [j for j in pool if j not in own]
+            if own and other:
+                rows.append({"task": task, "thesis": i, "title": pts[i].title,
+                             "own": float(sim[i, own].max()), "other": float(sim[i, other].max())})
+    own = sorted(r["own"] for r in rows)
+    other = sorted(r["other"] for r in rows)
+    lo, hi = float(np.quantile(other, lo_q)), float(np.quantile(own, hi_q))
+    if hi <= lo + 0.01:
+        hi = float(np.median(own))
+    for r in rows:
+        r.update(lo=lo, hi=hi, own_scaled=min(1.0, max(0.0, (r["own"] - lo) / (hi - lo))),
+                 other_scaled=min(1.0, max(0.0, (r["other"] - lo) / (hi - lo))))
+    return (lo, hi), rows
+
+
+GENERIC_TEXT = ("#TEXT: {title} — важная часть темы «{topic}». Этот вопрос имеет большое значение, вызывает "
+                "интерес и широко обсуждается; его стоит рассмотреть внимательно и подробно.")
+BODY_TAGS = ("#TEXT", "#BULLET", "#QUOTE", "#FORMULA", "#CHART", "#PLOT", "#DIAGRAM", "#TIMELINE", "#IMAGE")
+
+
+def generic_variants(items: dict[tuple, Item], annotations: dict[str, dict], per_original: int = 3
+                     ) -> tuple[dict[tuple, Item], list[dict]]:
+    """«Общие слова по теме» (EXP-024): у слайда тезиса заголовок остаётся, а содержимое заменено фразой без
+    содержания с заголовком слайда и темой презентации (заголовок первого слайда). Такой слайд по теме, но тезис
+    не раскрывает — ожидание: покрытие и награда вниз. Тезисы — первый, средний и последний содержательный
+    со своим отдельным слайдом."""
+    new_items, pairs = {}, []
+    for task, ann in sorted(annotations.items()):
+        item = items.get((task, "original"))
+        if item is None:
+            continue
+        lines = item.text.splitlines()
+        starts = [k for k, line in enumerate(lines) if line.strip().startswith("#SLIDE")]
+        bounds = [(a, b) for a, b in zip(starts, starts[1:] + [len(lines)])]
+        titles = [next((l.split(":", 1)[1].strip() for l in lines[a:b] if l.strip().startswith("#TITLE")), "")
+                  for a, b in bounds]
+        theses = ann["theses"][:-1] if item.context.get("conclusion") and len(ann["theses"]) > 1 else ann["theses"]
+        own = [(i, slides[0]) for i, slides in enumerate(theses) if len(slides) == 1 and 1 < slides[0] <= len(bounds)
+               and sum(slides[0] in other for other in ann["theses"]) == 1]
+        if not own:
+            continue
+        picks = sorted({own[0], own[len(own) // 2], own[-1]})[:per_original]
+        for i, s in picks:
+            a, b = bounds[s - 1]
+            block = [l for l in lines[a:b] if not l.strip().startswith(BODY_TAGS)]
+            title_at = next((k for k, l in enumerate(block) if l.strip().startswith("#TITLE")), 0)
+            block.insert(title_at + 1, GENERIC_TEXT.format(title=titles[s - 1] or "Этот раздел", topic=titles[0]))
+            key = (task, f"generic_body/T{i}")
+            new_items[key] = Item(key, task, "\n".join(lines[:a] + block + lines[b:]), dict(item.context))
+            pairs.append({"id": f"{task}/generic_body/T{i}", "task": task,
+                          "mode": "search" if item.context.get("search") else "plain", "family": "coverage",
+                          "kind": "generic_body", "strength": None, "target": "coverage", "diagnostic": False,
+                          "base": "original", "variant": f"generic_body/T{i}", "expect_total": "down",
+                          "expect_target": "down"})
+    return new_items, pairs
+
+
+def _source_everywhere(lines: list[str], ref: str) -> list[str]:
+    """Строки презентации, где у каждого слайда без ``#SOURCE`` в конце (перед пустыми строками) — ``#SOURCE: ref``."""
+    head, blocks = [], []
+    for line in lines:
+        if line.strip().startswith("#SLIDE"):
+            blocks.append([line])
+        elif blocks:
+            blocks[-1].append(line)
+        else:
+            head.append(line)
+    out = list(head)
+    for block in blocks:
+        if not any(l.lstrip().startswith("#SOURCE") for l in block):
+            k = len(block)
+            while k > 1 and not block[k - 1].strip():
+                k -= 1
+            block = block[:k] + [f"#SOURCE: {ref}"] + block[k:]
+        out += block
+    return out
+
+
+def source_variants(items: dict[tuple, Item]) -> tuple[dict[tuple, Item], list[dict]]:
+    """Пары для бонуса за ссылки (EXP-024) на исходниках с поиском и верными источниками: «ссылки убраны» (все
+    ``#SOURCE`` удалены; ожидание при бонусе — награда вниз) и «ссылка на каждом слайде» (каждому слайду без ссылки
+    добавлена ссылка на первую найденную статью, без нового содержания; ожидание — награда не выше: лазейка)."""
+    new_items, pairs = {}, []
+    for (task, vid), item in items.items():
+        refs = [r for r in (item.context.get("sources") or {}) if "#" not in r]
+        if vid != "original" or not item.context.get("search") or not refs:
+            continue
+        lines = item.text.splitlines()
+        variants = {}
+        if any(line.lstrip().startswith("#SOURCE") for line in lines):
+            variants["sources_removed"] = ("\n".join(l for l in lines if not l.lstrip().startswith("#SOURCE")),
+                                          "down")
+        variants["sources_everywhere"] = ("\n".join(_source_everywhere(lines, refs[0])), "not_up")
+        for kind, (text, expect) in variants.items():
+            key = (task, f"sources/{kind}")
+            new_items[key] = Item(key, task, text, dict(item.context))
+            pairs.append({"id": f"{task}/sources/{kind}", "task": task, "mode": "search", "family": "sources",
+                          "kind": kind, "strength": None, "target": "sources", "diagnostic": False,
+                          "base": "original", "variant": f"sources/{kind}", "expect_total": expect,
+                          "expect_target": expect})
+    return new_items, pairs
 
 
 def ablation_rows(pairs: list[dict], scores: dict[Config, dict], sigmas: dict[Config, float],

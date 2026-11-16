@@ -1,5 +1,6 @@
 # Здесь проверяем логику содержательной награды на подставных эмбеддере и лемматизаторе, без загрузки моделей.
 import math
+import zlib
 from types import SimpleNamespace
 
 import numpy as np
@@ -8,9 +9,9 @@ import pytest
 from presentation_rl.dsl import parse
 from presentation_rl.key_points import KeyPoint
 from presentation_rl.rendering.builder import ElementReport, RenderReport
-from presentation_rl.rewards import (Lemmatizer, RewardWeights, expected_slides, length_penalty, lexical_share, score,
-                                     similarity_matrix, slide_texts, thesis_backgrounds, tool_penalty, visual_details,
-                                     visual_score)
+from presentation_rl.rewards import (Lemmatizer, RewardWeights, assign_slides, expected_slides, length_penalty,
+                                     lexical_share, score, similarity_matrix, slide_texts, source_share,
+                                     thesis_backgrounds, tool_penalty, visual_details, visual_score)
 
 FORMS = {"льда": "лед", "лед": "лед", "фототока": "фототок", "фототок": "фототок", "года": "год", "г": "г",
          "матрицы": "матрица", "матрица": "матрица", "градиентного": "градиентный", "градиентный": "градиентный",
@@ -36,7 +37,7 @@ class FakeEmbedder:
         for text in texts:
             v = np.zeros(256, dtype=np.float32)
             for lemma in self.lemmatizer.content_lemmas(text):
-                v[hash(lemma) % 256] += 1
+                v[zlib.crc32(lemma.encode()) % 256] += 1  # не hash(): он меняется от запуска к запуску
             norm = np.linalg.norm(v)
             rows.append(v / norm if norm else v)
         return np.stack(rows)
@@ -422,3 +423,55 @@ def test_defaults_are_the_accepted_changes():
     deck = deck_of(["#TITLE: Тема"], ["#TITLE: Слайд", "#TEXT: текст", "#FORMULA: a", "#FORMULA: a"], ["#TITLE: Итог"])
     result = visual_details(deck, None, 1, True, None, embedder=EMB, tau={})
     assert result.duplicates == 1 and result.formula_over == 1  # повтор формулы — как формула сверх предела
+
+
+# --------------------------------------------------------------------------- покрытие v2 и ссылки (EXP-024)
+
+def test_assign_slides_respects_capacity_greedily():
+    sim = np.array([[0.9, 0.1], [0.8, 0.2], [0.7, 0.6]])
+    assert assign_slides(sim, [0, 1, 2], [0, 1], 1) == {0: 0, 1: None, 2: 1}
+    assert assign_slides(sim, [0, 1, 2], [0, 1], 2) == {0: 0, 1: 0, 2: 1}
+
+
+def test_capacity_leaves_thesis_without_slide_and_scale_clips():
+    deck = deck_of(["#TITLE: Матрица", "#TEXT: матрица определитель ранг"], ["#TITLE: Спуск", "#TEXT: градиентный спуск"])
+    points = [KeyPoint("Матрица", "матрица определитель", []), KeyPoint("Ранг", "матрица ранг", []),
+              KeyPoint("Спуск", "градиентный спуск", [])]
+    kwargs = dict(conclusion=False, slide_range=None, embedder=EMB, lemmatizer=LEM)
+    best = score(deck, points, **kwargs)
+    capped = score(deck, points, weights=RewardWeights(coverage_capacity=1), **kwargs)
+    assert best.uncovered == 0 and capped.uncovered == 1 and capped.coverage < best.coverage
+    assert [t.best_slide for t in capped.theses].count(None) == 1
+    raw = [t.similarity for t in best.theses]
+    lo, hi = min(raw) + 0.01, max(raw) - 0.01
+    scaled = score(deck, points, weights=RewardWeights(coverage_scale=(lo, hi)), **kwargs)
+    expected = [min(1.0, max(0.0, (x - lo) / (hi - lo))) for x in raw]
+    assert scaled.coverage == pytest.approx(sum(expected) / len(expected))
+    assert scaled.total - best.total == pytest.approx(scaled.coverage - best.coverage)
+
+
+class GrammemeAnalyzer(FakeAnalyzer):
+    def parse(self, word):
+        parsed = super().parse(word)[0]
+        return [SimpleNamespace(normal_form=parsed.normal_form.lower(),
+                                tag=SimpleNamespace(POS=parsed.tag.POS, grammemes=set()))]
+
+
+def test_source_bonus_counts_valid_sources_with_facts_from_tool_text():
+    lem = Lemmatizer(GrammemeAnalyzer())
+    deck = deck_of(["#TITLE: открытие", "#TEXT: структура найдена в 1953", "#SOURCE: d1"],
+                   ["#TITLE: значение", "#TEXT: основа биологии", "#SOURCE: d1"],
+                   ["#TITLE: итог", "#TEXT: вывод без ссылки"])
+    report = RenderReport(path=None, items=[ElementReport(1, "SOURCE", "ok", 3), ElementReport(2, "SOURCE", "ok", 6)])
+    tool = "Структуру определили в 1953 году"
+    texts = slide_texts(deck, report)
+    assert source_share(texts, report, tool, lem, facts=True) == pytest.approx(1 / 3)
+    assert source_share(texts, report, tool, lem, facts=False) == pytest.approx(2 / 3)
+    points = [KeyPoint("открытие", "структура найдена", [])]
+    kwargs = dict(conclusion=False, slide_range=None, embedder=EMB, lemmatizer=lem, report=report, tool_text=tool)
+    off = score(deck, points, **kwargs)
+    on = score(deck, points, weights=RewardWeights(source_bonus=0.1), **kwargs)
+    plain = score(deck, points, weights=RewardWeights(source_bonus=0.1), search=False, **kwargs)
+    assert off.sources == 0 and on.sources == pytest.approx(1 / 3)
+    assert on.total - off.total == pytest.approx(0.1 / 3) and plain.sources == 0
+

@@ -566,6 +566,12 @@ class RewardWeights:
     fake_quote_penalty: float = 0.1  # цитата, которой нет в выдаче
     visual_tau: dict[str, float] | None = field(default_factory=lambda: dict(VISUAL_TAU))  # None — без проверки
     visual_unverified: float = 0.5  # доля бонуса за вид визуала без порога
+    # покрытие v2 и ссылки (EXP-024, 16.11.2026): по умолчанию выключены до проверки на испорченных презентациях
+    coverage_scale: tuple[float, float] | None = None  # (lo, hi): сходство тезиса → clip((s − lo)/(hi − lo), 0, 1)
+    coverage_capacity: int | None = None  # не больше стольких тезисов на один слайд; None — лучший слайд каждому
+    coverage_binary: bool = False  # при coverage_scale: тезис раскрыт (1) или нет (0) по середине шкалы — доля раскрытых
+    source_bonus: float = 0.0  # × доля слайдов с верной #SOURCE (только «Поиск: есть»)
+    source_facts: bool = True  # слайд засчитывается, только если хоть одно его число или имя есть в выдаче
 
 
 @dataclass
@@ -603,6 +609,8 @@ class RewardResult:
     unrelated_visuals: int = 0  # визуал ниже порога связи со слайдом
     visual_checked: dict[str, int] = field(default_factory=dict)  # проверено на связь, по видам (аналитика)
     visual_unrelated: dict[str, int] = field(default_factory=dict)  # ниже порога связи, по видам (аналитика)
+    sources: float = 0.0  # доля слайдов с верной #SOURCE, засчитанных для бонуса (при source_bonus > 0)
+    uncovered: int = 0  # тезисов без слайда (coverage_capacity) или с нулевым покрытием (coverage_scale)
 
     def components(self) -> dict[str, float]:
         return {"total": self.total, "coverage": self.coverage, "keys": self.keys, "length": self.length,
@@ -611,7 +619,7 @@ class RewardResult:
                 "bad_sources": self.bad_sources, "format": self.format,
                 "text_overflow": self.text_overflow, "tools": self.tools, "repeats": self.repeats,
                 "contradictions": self.contradictions, "formula_over": self.formula_over,
-                "unrelated_visuals": self.unrelated_visuals}
+                "unrelated_visuals": self.unrelated_visuals, "sources": self.sources, "uncovered": self.uncovered}
 
 
 def similarity_matrix(points: Sequence[KeyPoint], texts: Sequence[SlideText], embedder: Embedder,
@@ -684,13 +692,15 @@ def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_ran
         topic_pairs = set().union(*(number_units(lemmatizer.tokens(k)) for p in points for k in p.key))
         # последний слайд — заключение: в выбор лучшего для содержательных тезисов не входит
         pool = list(range(n - 1)) if has_conclusion and n > 1 else list(range(n))
+        content = list(range(len(points) - 1 if has_conclusion else len(points)))
+        assigned = assign_slides(sim, content, pool, weights.coverage_capacity) if weights.coverage_capacity else {}
         for i, point in enumerate(points):
             if has_conclusion and i == len(points) - 1:
                 candidates = [n - 1]
             else:
                 candidates = pool
             ranked = sorted(candidates, key=lambda j: -float(sim[i, j]))
-            best = ranked[0]
+            best = assigned[i] if i in assigned else ranked[0]  # None — тезису не досталось слайда
             key_slides = ranked[:1] if has_conclusion and i == len(points) - 1 else ranked[:2]
             b = float(backgrounds[i]) if backgrounds is not None else None
             # ключи — на слайдах, где тезис раскрыт (выше фона), если включено
@@ -703,33 +713,98 @@ def score(deck: Deck, points: Sequence[KeyPoint], *, conclusion: bool, slide_ran
                 needle = [lemma for lemma, _ in key_tokens]
                 (found if any(contains(slide_lemmas[j], needle) for j in counted_slides) else missing).append(key)
                 contradictions += contradicts(number_units(key_tokens), pairs_here, topic_pairs)
-            theses.append(ThesisResult(best + 1, float(sim[i, best]), [j + 1 for j in key_slides], found, missing,
-                                       b, contradictions))
+            theses.append(ThesisResult(best + 1 if best is not None else None,
+                                       float(sim[i, best]) if best is not None else 0.0,
+                                       [j + 1 for j in key_slides], found, missing, b, contradictions))
     else:
         theses = [ThesisResult(None, 0.0, [], [], list(dict.fromkeys(p.key)),
                                float(backgrounds[i]) if backgrounds is not None else None)
                   for i, p in enumerate(points)]
 
     def thesis_coverage(t: ThesisResult) -> float:
-        if not weights.relative:
-            return t.similarity
-        return (t.similarity - t.background) / max(1e-6, 1 - t.background)  # без отсечения нулём
+        if t.best_slide is None:
+            return 0.0
+        if weights.relative:
+            return (t.similarity - t.background) / max(1e-6, 1 - t.background)  # без отсечения нулём
+        if weights.coverage_scale is not None:
+            lo, hi = weights.coverage_scale
+            scaled = float(min(1.0, max(0.0, (t.similarity - lo) / max(1e-6, hi - lo))))
+            return float(scaled >= 0.5) if weights.coverage_binary else scaled
+        return t.similarity
 
-    coverage = float(np.mean([thesis_coverage(t) for t in theses])) if theses else 0.0
+    per_thesis = [thesis_coverage(t) for t in theses]
+    coverage = float(np.mean(per_thesis)) if theses else 0.0
+    uncovered = sum(1 for t, c in zip(theses, per_thesis) if t.best_slide is None
+                    or (weights.coverage_scale is not None and c <= 0.0))
+    sources = source_share(texts, report, tool_text, lemmatizer, weights.source_facts) \
+        if weights.source_bonus and search and tool_text is not None else 0.0
     contradictions = sum(t.contradictions for t in theses)
     keys = float(np.mean([len(t.found_keys) / max(1, len(t.found_keys) + len(t.missing_keys)) for t in theses])) \
         if theses else 0.0
     total = (weights.coverage * coverage + weights.keys * keys - weights.length * length
              + weights.visual * v.value - weights.forbidden_image * v.forbidden - tools
              - weights.bad_source * bad_sources - weights.format * format_penalty
-             - weights.text_overflow * overflow_slides - weights.contradiction * contradictions)
+             - weights.text_overflow * overflow_slides - weights.contradiction * contradictions
+             + weights.source_bonus * sources)
     if weights.direct_penalties:  # один элемент — один штраф; бонуса за ненарисованное нет
         total -= (weights.overflow_penalty * v.slide_overflow + weights.render_penalty * v.render_errors
                   + weights.formula_over_penalty * v.formula_over + weights.fake_quote_penalty * v.fake_quotes)
     return RewardResult(total, coverage, keys, length, v.value, v.forbidden, theses, v.counted, (low, high),
                         v.slide_overflow, v.render_errors, v.fake_quotes, bad_sources, format_penalty, overflow_slides,
                         tools, repeats, contradictions, v.formula_over, v.unrelated,
-                        visual_checked=dict(v.checked), visual_unrelated=dict(v.unrelated_kinds))
+                        visual_checked=dict(v.checked), visual_unrelated=dict(v.unrelated_kinds),
+                        sources=sources, uncovered=uncovered)
+
+
+def assign_slides(sim: np.ndarray, theses: list[int], slides: list[int], capacity: int) -> dict[int, int | None]:
+    """Сопоставление «тезис → слайд», где один слайд раскрывает не больше ``capacity`` тезисов (покрытие v2):
+    жадно по убыванию сходства — пара с наибольшим сходством забирает слайд первой. Тезису, которому слайда
+    не досталось, — None (покрытие 0). Жадный выбор, а не оптимальный: проще и предсказуемее, а при одном
+    подходящем слайде на тезис (95% размеченных тезисов, EXP-016) совпадает с оптимальным."""
+    left = {j: capacity for j in slides}
+    result: dict[int, int | None] = {i: None for i in theses}
+    order = sorted(((float(sim[i, j]), i, j) for i in theses for j in slides), key=lambda x: (-x[0], x[1], x[2]))
+    for _, i, j in order:
+        if result[i] is None and left[j] > 0:
+            result[i] = j
+            left[j] -= 1
+    return result
+
+
+NAME_GRAMMEMES = frozenset({"Name", "Surn", "Patr", "Geox", "Orgn", "Trad"})
+
+
+def slide_facts(text: str, lemmatizer: Lemmatizer) -> set[str]:
+    """Числа и имена текста слайда — то, что можно сверить с источником буквально (решение 08.11.2026).
+    Имена — слова с заглавной буквы, которые словарь считает именем, фамилией, отчеством, географическим названием
+    или организацией, и слова латиницей с заглавной буквы; числа — как в награде («6 400» → «6400»)."""
+    facts = {lemma for lemma, pos in lemmatizer.tokens(text) if pos == "NUMB"}
+    for word in re.findall(r"[A-ZА-ЯЁ][\w-]+", text):
+        if re.fullmatch(r"[A-Za-z][\w-]*", word):
+            facts.add(word.lower())
+            continue
+        parsed = lemmatizer.analyzer.parse(word)
+        if parsed and NAME_GRAMMEMES & set(parsed[0].tag.grammemes):
+            facts.add(parsed[0].normal_form.replace("ё", "е"))
+    return facts
+
+
+def seen_words(tool_text: str, lemmatizer: Lemmatizer) -> set[str]:
+    """Слова выдачи для сверки фактов: леммы и сами слова в нижнем регистре."""
+    return {lemma for lemma, _ in lemmatizer.tokens(tool_text)} | {w.lower() for w in tool_text.split()}
+
+
+def source_share(texts: Sequence[SlideText], report, tool_text: str, lemmatizer: Lemmatizer, facts: bool) -> float:
+    """Доля слайдов с верной ``#SOURCE`` (статья или раздел из выдачи этого эпизода, статус сборщика ok); при
+    ``facts`` слайд засчитывается, только если хоть одно его число или имя есть в выдаче — ссылка на найденную
+    статью без прочитанного содержания не считается (против лазейки «ссылка на каждом слайде»)."""
+    if report is None or not texts:
+        return 0.0
+    ok = {item.slide for item in report.items if item.kind == "SOURCE" and item.status == "ok"}
+    if facts and ok:
+        seen = seen_words(tool_text, lemmatizer)
+        ok = {s for s in ok if 1 <= s <= len(texts) and slide_facts(texts[s - 1].full, lemmatizer) & seen}
+    return len(ok) / len(texts)
 
 
 def load_key_points(path) -> dict[str, list[KeyPoint]]:

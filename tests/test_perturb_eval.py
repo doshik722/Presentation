@@ -3,14 +3,15 @@ import json
 
 from presentation_rl.perturb import generate
 from presentation_rl.dsl import parse
-from presentation_rl.perturb_eval import (VARIANTS, Config, Item, Rules, ablation_configs, ablation_rows, author_answers,
+from presentation_rl.perturb_eval import (COVERAGE_VARIANTS, EXP016_VARIANTS, SOURCE_VARIANTS, VARIANTS, Config, Item, Rules, ablation_configs, ablation_rows, author_answers,
                                           build_all, calibrate_tau, check_pairs, choose, conflict_rows, edge,
                                           evaluate_pairs, family_shares, load_conflicts, load_foreign, nested_cv,
-                                          score_items, signed, stratified_folds, tally, verdict)
+                                          calibrate_coverage, generic_variants, score_items, signed, source_variants,
+                                          stratified_folds, tally, verdict)
 from presentation_rl.rewards import Lemmatizer
 
 from test_perturb import ANNOTATION, CONTEXT, DONOR, ORIGINAL, POINTS
-from test_rewards import FakeAnalyzer, FakeEmbedder
+from test_rewards import FakeAnalyzer, FakeEmbedder, GrammemeAnalyzer
 
 
 def test_verdicts_use_margins():
@@ -110,8 +111,8 @@ def test_folds_are_balanced_by_mode_and_cv_reports_stability():
 
 def test_ablation_variants_score_end_to_end(tmp_path):
     configs = ablation_configs("fake", 0.2, [0.5, 1.0], [0.5, 1.0])
-    assert [c.variant for c in configs[:len(VARIANTS)]] == list(VARIANTS)
-    assert len(configs) == len(VARIANTS) + 3 and Config("fake", 0.2, 1.0, 0.5).name == "fake|a=0.2|len=1.0|keys=0.5"
+    assert [c.variant for c in configs[:len(EXP016_VARIANTS)]] == list(EXP016_VARIANTS)
+    assert len(configs) == len(EXP016_VARIANTS) + 3 and Config("fake", 0.2, 1.0, 0.5).name == "fake|a=0.2|len=1.0|keys=0.5"
     assert configs[-1].name.endswith("|all") and configs[0].weights() == Config("fake", 0.2, 1.0, 0.5).weights()
     (tmp_path / "sft.jsonl").write_text("\n".join(json.dumps({"answer": ORIGINAL}) for _ in range(2)), encoding="utf-8")
     foreign = load_foreign(tmp_path / "sft.jsonl")
@@ -129,7 +130,7 @@ def test_ablation_variants_score_end_to_end(tmp_path):
     assert scores[configs[1]][("t1", "original")]["coverage"] < scores[base][("t1", "original")]["coverage"]  # фон — сам исходник
     assert "contradictions" in scores[base][("t1", "original")]
     rows = ablation_rows(pairs, scores, {c: 0.01 for c in configs}, base)
-    assert {r["variant"] for r in rows} == set(VARIANTS)
+    assert {r["variant"] for r in rows} == set(EXP016_VARIANTS)
     try:
         score_items(items, {"t1": POINTS}, configs[1], embedder, lemmatizer)
     except ValueError:
@@ -149,3 +150,50 @@ def test_tau_is_calibrated_on_own_slides_against_foreign_visuals():
     assert row["positives"] == 30 and row["negatives"] == 2 * 10 * 10  # a↔b, у c своей темы того же типа нет
     assert row["positives_pass"] >= 0.95 and row["negatives_filtered"] == 1.0 and tau == {"IMAGE": row["tau"]}
     assert not next(r for r in report if r["kind"] == "DIAGRAM")["verified"]
+
+
+def test_coverage_v2_and_source_variants_end_to_end():
+    result = generate("t1", ORIGINAL, ANNOTATION, POINTS, CONTEXT, DONOR)
+    items = {("t1", vid): Item(("t1", vid), "t1", v["text"], {**CONTEXT, **v["context"]})
+             for vid, v in result.variants.items()}
+    pairs = [{**p.__dict__, "task": "t1", "mode": "search"} for p in result.pairs]
+    extra, source_pairs = source_variants(items)
+    assert {p["kind"] for p in source_pairs} == {"sources_removed", "sources_everywhere"}
+    assert "#SOURCE" not in extra[("t1", "sources/sources_removed")].text
+    everywhere = extra[("t1", "sources/sources_everywhere")].text
+    assert everywhere.count("#SOURCE: d1") == ORIGINAL.count("#SLIDE")
+    items.update(extra)
+    build_all(items, log=lambda _: None)
+    lemmatizer, embedder = Lemmatizer(GrammemeAnalyzer()), FakeEmbedder()
+    scale, rows = calibrate_coverage(items, {"t1": ANNOTATION}, {"t1": POINTS}, embedder, lemmatizer)
+    assert len(rows) == 3 and scale[1] > scale[0]  # три содержательных тезиса, заключение отдельно
+    configs = [Config("fake", 0.2, 1.0, 0.5, v) for v in ("accepted", *COVERAGE_VARIANTS, *SOURCE_VARIANTS)]
+    scores = {c: score_items(items, {"t1": POINTS}, c, embedder, lemmatizer, scale=scale) for c in configs}
+    accepted, any_src = configs[0], configs[-2]
+    original, spammed = ("t1", "original"), ("t1", "sources/sources_everywhere")
+    assert scores[accepted][spammed]["total"] == scores[accepted][original]["total"]  # без бонуса ссылки не важны
+    assert scores[any_src][spammed]["sources"] == 1.0 and scores[any_src][spammed]["total"] > scores[any_src][original]["total"]
+    for c in configs[1:5]:  # покрытие v2: исходник раскрывает все тезисы своими слайдами
+        assert scores[c][original]["uncovered"] == 0
+    rows = evaluate_pairs(pairs + source_pairs, scores[configs[3]], m=0.01, eps=0.004)
+    assert any(r["family"] == "sources" for r in rows)
+
+
+def test_generic_body_keeps_title_and_replaces_content():
+    items = {("t1", "original"): Item(("t1", "original"), "t1", ORIGINAL, CONTEXT)}
+    extra, pairs = generic_variants(items, {"t1": ANNOTATION})
+    assert [p["variant"] for p in pairs] == ["generic_body/T0", "generic_body/T1", "generic_body/T2"]
+    text = extra[("t1", "generic_body/T1")].text
+    assert "#TITLE: Второе" in text and "Объяснение второго" not in text and "#IMAGE: схема второго" not in text
+    assert "Второе — важная часть темы «Тема»" in text and "Объяснение первого" in text
+    items.update(extra)
+    build_all(items, log=lambda _: None)
+    lemmatizer, embedder = Lemmatizer(GrammemeAnalyzer()), FakeEmbedder()
+    scores = score_items(items, {"t1": POINTS}, Config("fake", 0.2, 1.0, 0.5, "accepted"), embedder, lemmatizer)
+    assert pairs[1]["expect_total"] == "down" and pairs[1]["kind"] == "generic_body"  # падение — на bge-m3, не здесь
+    assert ("t1", "generic_body/T1") in scores
+    scale = (0.0, 0.5)
+    share = score_items(items, {"t1": POINTS}, Config("fake", 0.2, 1.0, 0.5, "cov_share"), embedder, lemmatizer,
+                        scale=scale)
+    assert share[("t1", "original")]["coverage"] in {0.0, 0.25, 0.5, 0.75, 1.0}  # доля раскрытых из 4 тезисов
+

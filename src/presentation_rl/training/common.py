@@ -26,7 +26,6 @@ from ..environment import Episode, build_prompt, run_episode
 from ..tasks import Task
 
 TARGET_MODULES = ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj")
-NAME_GRAMMEMES = frozenset({"Name", "Surn", "Patr", "Geox", "Orgn", "Trad"})
 HASHED_SOURCES = ("environment.py", "dsl.py", "rewards.py", "prompts.py", "tasks.py", "rendering/builder.py",
                   "tools/wiki_tools.py", "tools/cache.py", "training/common.py", "training/grpo.py",
                   "training/vllm_client.py")
@@ -324,20 +323,10 @@ class RewardModel:
 
 
 def slide_facts(text: str, lemmatizer) -> set[str]:
-    """Числа и имена текста слайда — то, что можно сверить с источником буквально (решение 08.11.2026).
-    Имена — слова с заглавной буквы, которые словарь считает именем, фамилией, отчеством, географическим названием
-    или организацией, и слова латиницей с заглавной буквы; числа — как в награде («6 400» → «6400»)."""
-    import re
+    """Числа и имена текста слайда (``rewards.slide_facts``; там же — бонус за верные ссылки)."""
+    from ..rewards import slide_facts as facts
 
-    facts = {lemma for lemma, pos in lemmatizer.tokens(text) if pos == "NUMB"}
-    for word in re.findall(r"[A-ZА-ЯЁ][\w-]+", text):
-        if re.fullmatch(r"[A-Za-z][\w-]*", word):
-            facts.add(word.lower())
-            continue
-        parsed = lemmatizer.analyzer.parse(word)
-        if parsed and NAME_GRAMMEMES & set(parsed[0].tag.grammemes):
-            facts.add(parsed[0].normal_form.replace("ё", "е"))
-    return facts
+    return facts(text, lemmatizer)
 
 
 def episode_stats(deck, result, explicit: bool, visual_kinds) -> dict:
