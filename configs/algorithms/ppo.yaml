@@ -1,8 +1,64 @@
-# Здесь будем фиксировать настройки PPO; этот шаблон пока не запускает обучение.
+# Здесь задаём PPO по спецификации docs/ppo.md; общие с GRPO параметры совпадают с configs/algorithms/grpo.yaml.
 algorithm: ppo
-implemented: false
-adaptation: lora
-lora_rank: 16
-learning_rate: null
-critic_architecture: null
-reward_weights: {}
+implemented: true
+runs_dir: runs/ppo
+policy_model: t-tech/T-lite-it-2.1         # старт и опорная — исходная T-lite, как у GRPO
+policy_revision: d125c970c553de58fcee3c937d5e4867d4a448d8
+vllm_url: http://127.0.0.1:8000
+vllm_base_name: base
+wiki_snapshot: data/sources/wiki_cache
+# шаг — как у GRPO: 4 задания с поиском + 4 без, по 8 ответов, 150 шагов
+tasks_per_mode: 4
+group_size: 8
+steps: 150
+# эпизод — как у GRPO
+max_new_tokens: 12000
+max_context: 25000
+max_calls: 10
+temperature: 0.9
+workers: 64
+# политика — как у GRPO
+lora_rank: 32
+lora_alpha: 32
+learning_rate: 1.0e-5
+betas: [0.9, 0.95]
+eps: 1.0e-8
+weight_decay: 0.0
+grad_clip: 1.0
+logits_chunk: 1024
+reward_floor: -1.0
+kl_beta: 0.02
+clip_eps: 0.2
+std_floor: 0.02
+# PPO (docs/ppo.md, разделы 6–8)
+ppo_epochs: 2                              # μ: два прохода, один шаг оптимизатора на проход
+gae_lambda: 1.0                            # решение 18.11.2026: λ = 1 у обоих сидов
+head: linear                               # вид головы — по EXP-028 (linear | mlp)
+head_hidden: 256
+head_lr: 1.0e-4                            # по EXP-028 (второй кандидат 3e-4)
+head_betas: [0.9, 0.999]
+head_eps: 1.0e-8
+head_weight_decay: 1.0e-4
+head_batch: 1024
+head_epochs_step: 1
+head_grad_clip: 1.0
+head_device: cuda:0
+# разогрев (docs/ppo.md, раздел 5)
+warmup_steps: 10                           # × 64 эпизода исходной модели, у каждого сида свой
+warmup_max_positions: 200000
+warmup_max_epochs: 10
+warmup_patience: 2
+warmup_holdout: 0.2
+warmup_epochs: null                        # по EXP-028
+warmup_dir: null                           # папка разогрева сида: runs/ppo/warmup_seed<сид>
+# validation и сохранение — как у GRPO
+eval_every: 10
+save_every: 5
+val_topics: 8
+val_samples: 2
+keep_states: 2
+kl_old_new_episodes: 4
+max_logprob_mismatch: {mean_abs: 0.012, p99: 0.09}
+max_skipped_updates: 0.05
+embedder_device: cuda:1
+seed: 0

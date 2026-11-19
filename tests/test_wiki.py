@@ -123,6 +123,28 @@ def test_client_retries_and_records_failures():
     assert client.requests == 2 and client.failures == ["сеть: timed out"]
 
 
+def test_client_retries_incomplete_read_and_truncated_json():
+    import http.client
+    import json
+
+    answers = [http.client.IncompleteRead(b""), json.JSONDecodeError("обрыв", "{", 1), {"query": {"search": []}}]
+
+    def fetch(url, headers):
+        answer = answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    client = WikiClient(fetch=fetch, min_interval=0)
+    import presentation_rl.tools.wiki as wiki
+    sleep, wiki.time.sleep = wiki.time.sleep, lambda s: None
+    try:
+        assert client.search("ru", "спуск") == []
+    finally:
+        wiki.time.sleep = sleep
+    assert client.requests == 3 and len(client.failures) == 2
+
+
 def test_client_waits_when_search_is_too_busy():
     busy = {"error": {"code": "cirrussearch-too-busy-error", "info": "Search is currently too busy."}}
     answers = [busy, busy, {"query": {"search": []}}]

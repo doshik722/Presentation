@@ -18,6 +18,7 @@
 """
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import re
@@ -272,7 +273,9 @@ class WikiClient:
                     delay *= 2
                     continue
                 raise
-            except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            # IncompleteRead и другие обрывы HTTP, обрезанный JSON — тоже сеть (сбой второго сида GRPO, 18.11.2026)
+            except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException,
+                    json.JSONDecodeError) as exc:
                 self.failures.append(f"сеть: {getattr(exc, 'reason', exc)}")
                 if attempt < self.retries or waited < self.network_patience:
                     pause = min(delay, 30.0)
