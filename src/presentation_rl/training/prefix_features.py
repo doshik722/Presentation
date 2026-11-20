@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterator
+import statistics
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import groupby
+from time import perf_counter
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -16,7 +19,10 @@ from ..perturb import _RESPONSE_RE, episode_context
 from ..rendering import build_presentation, pick_theme
 from ..rewards import score
 from ..tasks import Task
-from .common import RewardModel, target_positions
+from .common import RewardModel, mode_task, stable_seed, target_positions
+
+if TYPE_CHECKING:
+    from .ppo import PPOConfig
 
 _SLIDE_LINE = re.compile(r"^[^\S\n]*#SLIDE(?![A-Z_])[^\n]*\n", re.MULTILINE | re.IGNORECASE | re.ASCII)
 _MAX_LINE = ParseLimits().max_line_length
@@ -170,3 +176,80 @@ class PrefixFeatureExtractor:
         values[:, -3] = np.arange(len(actions)) / self.max_new_tokens
         values[:, -2] = np.maximum(0, self.max_context - actions) / self.max_context
         return PrefixFeatures(values, len(events))
+
+
+def prepare_prefix_warmup(episodes: Sequence[dict], tasks: Mapping[str, Task],
+                          extract: PrefixFeatureExtractor, config: PPOConfig) -> dict:
+    """Готовлю буфер PPO на всех сохранённых эпизодах и записываю время каждого пакета."""
+    import torch
+
+    from .ppo import sample_positions
+
+    per_mode = config.tasks_per_mode * config.group_size
+    episodes = sorted(episodes, key=lambda e: e["step"])  # порядок внутри шага сохраняется
+    ids = {(e["step"], e["mode"], e["task"], e["sample"]) for e in episodes}
+    batches = {step: list(group) for step, group in groupby(episodes, key=lambda e: e["step"])}
+    if len(ids) != len(episodes) or set(batches) != set(range(1, config.warmup_steps + 1)):
+        raise ValueError("в разогреве пропущены шаги или продублированы эпизоды")
+    if any(len(batch) != 2 * per_mode or sum(e["mode"] == "plain" for e in batch) != per_mode
+           or sum(e["mode"] == "search" for e in batch) != per_mode for batch in batches.values()):
+        raise ValueError(f"нужен полный разогрев: по {per_mode} эпизодов каждого режима на шаг")
+
+    counts = [sum(e["mask"][1:]) for e in episodes]
+    keep = sample_positions(counts, config.warmup_max_positions, stable_seed(config.seed, "warmup-positions"))
+    data = {"features": [], "positions": [], "counts": [], "rewards": [], "tasks": [], "modes": [],
+            "timing": [], "feature_names": list(FEATURE_NAMES)}
+    for step, rows in groupby(zip(episodes, keep, counts), key=lambda row: row[0]["step"]):
+        began = perf_counter()
+        score_calls = 0
+        for episode, positions, count in rows:
+            if not positions:
+                continue
+            task = mode_task(tasks[episode["task"]], episode["mode"])
+            result = extract(task, episode["ids"], episode["mask"])
+            data["features"].append(torch.from_numpy(result.values[positions]))
+            data["positions"].append(positions)
+            data["counts"].append(count)
+            data["rewards"].append(episode["reward"])
+            data["tasks"].append(episode["task"])
+            data["modes"].append(episode["mode"])
+            score_calls += result.score_calls
+        seconds = perf_counter() - began
+        data["timing"].append({"step": step, "seconds": seconds, "score_calls": score_calls})
+        print(f"признаки: шаг {step}/{config.warmup_steps} · {seconds:.1f} с · "
+              f"{score_calls} оценок", flush=True)
+    return data
+
+
+def fit_prefix_head(data: dict, config: PPOConfig, holdout: set[str], lr: float = 1e-3) -> dict:
+    """Проверяю Z-lin на отложенных темах. Масштабы и обе константы беру из обучающей части."""
+    import torch
+
+    from .ppo import fit_warmup_head, head_values, paired_improvement
+
+    train = [x for x, topic in zip(data["features"], data["tasks"]) if topic not in holdout]
+    if not train or len(train) == len(data["features"]):
+        raise ValueError("нужны непустые обучающая и отложенная части")
+    scale, mean = torch.std_mean(torch.cat(train), dim=0, unbiased=False)
+    scale = torch.where(scale > 1e-8, scale, 1.0)
+    data = data | {"features": [(x - mean) / scale for x in data["features"]]}
+    fit = fit_warmup_head(data, config, "linear", lr, holdout)
+    fit["feature_scaler"] = {"mean": mean.tolist(), "scale": scale.tolist(), "names": data["feature_names"]}
+
+    errors_by_mode: dict[str, list[tuple[int, float]]] = {}
+    paired_rows = []
+    for x, r, topic, mode in zip(data["features"], data["rewards"], data["tasks"], data["modes"]):
+        if topic not in holdout:
+            continue
+        baseline_error = (r - fit["mode_means"][mode]) ** 2
+        vs = head_values(fit["head"], x, config.head_device)
+        errors_by_mode.setdefault(mode, []).append((len(vs), baseline_error))
+        paired_rows.append({"task": topic, "mode": mode,
+                            "d": baseline_error - statistics.fmean((r - v) ** 2 for v in vs)})
+    metrics = fit["holdout"]
+    metrics["paired_mode"] = paired_improvement(paired_rows)
+    for mode, rows in errors_by_mode.items():
+        metrics[f"{mode}_all_mse_mode"] = sum(n * error for n, error in rows) / sum(n for n, _ in rows)
+    all_rows = [row for rows in errors_by_mode.values() for row in rows]
+    metrics["all_mse_mode"] = sum(n * error for n, error in all_rows) / sum(n for n, _ in all_rows)
+    return fit
