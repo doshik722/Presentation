@@ -221,16 +221,19 @@ def prepare_prefix_warmup(episodes: Sequence[dict], tasks: Mapping[str, Task],
     return data
 
 
-def fit_prefix_head(data: dict, config: PPOConfig, holdout: set[str], lr: float = 1e-3, *,
-                    kind: str = "linear", reference: Sequence | None = None, use_prefix: bool = True) -> dict:
-    """Проверяю голову на Z, на T-lite или на обоих наборах признаков."""
+def fit_prefix_head(data: dict, config: PPOConfig, holdout: set[str] | None, lr: float = 1e-3, *,
+                    kind: str = "linear", reference: Sequence | None = None, use_prefix: bool = True,
+                    epochs: int | None = None) -> dict:
+    """Обучаю критик на префиксных признаках, скрытых состояниях T-lite или на обоих наборах."""
     import torch
 
     from .ppo import fit_warmup_head, head_values, paired_improvement
 
-    train = [i for i, topic in enumerate(data["tasks"]) if topic not in holdout]
-    if not train or len(train) == len(data["features"]):
+    train = [i for i, topic in enumerate(data["tasks"]) if holdout is None or topic not in holdout]
+    if not train or (holdout is not None and len(train) == len(data["features"])):
         raise ValueError("нужны непустые обучающая и отложенная части")
+    if holdout is None and (epochs is None or epochs < 1):
+        raise ValueError("для итогового разогрева нужно задать число эпох")
     if not use_prefix and reference is None:
         raise ValueError("для головы на T-lite нужны признаки опорной модели")
     if reference is not None and len(reference) != len(data["features"]):
@@ -247,9 +250,11 @@ def fit_prefix_head(data: dict, config: PPOConfig, holdout: set[str], lr: float 
     else:
         features = list(reference)
     data = data | {"features": features}
-    fit = fit_warmup_head(data, config, kind, lr, holdout)
+    fit = fit_warmup_head(data, config, kind, lr, holdout, epochs=epochs)
     fit["feature_scaler"] = scaler
     fit["input_dim"] = features[0].shape[1]
+    if holdout is None:
+        return fit
 
     errors_by_mode: dict[str, list[tuple[int, float]]] = {}
     paired_rows = []
@@ -298,16 +303,101 @@ def prefix_warmup_code_hash() -> str:
 
 
 def prefix_cache_matches(saved: dict, expected: dict) -> bool:
-    """Принимаю старый буфер Z из 5780238 только при том же извлечении и тех же входах."""
+    """Сверяю входы и принимаю старые хеши файлов при неизменном извлечении и выборке позиций."""
     if saved == expected:
         return True
-    name = "training/prefix_features.py"
-    saved_hash = saved.get("code", {}).get(name)
-    if expected["code"][name] != "26bbaf61c5d797548d7cc0ba0023488eecba83446cfb352e5add7eb9a74658c9":
-        return False
-    if saved_hash not in {
+    from pathlib import Path
+
+    from .common import file_hash
+
+    actual = saved.get("code", {})
+    code = dict(expected["code"])
+    prefix_name = "training/prefix_features.py"
+    if code.get(prefix_name) == "26bbaf61c5d797548d7cc0ba0023488eecba83446cfb352e5add7eb9a74658c9" and actual.get(prefix_name) in {
         "78a89104d2b58f4f44df1bd790d61f787a906f7fcd82d4da16f027fb3d939cde",
         "cf37cf026ec8b0eb814d16c931f4d75e6aad0ac93d7d3a48e0208cdead8bff71",
     }:
-        return False
-    return saved == expected | {"code": expected["code"] | {name: saved_hash}}
+        code[prefix_name] = actual[prefix_name]
+    ppo_name = "training/ppo.py"
+    ppo_file = Path(__file__).with_name("ppo.py")
+    sampler_hash = prefix_sampling_code_hash(ppo_file)
+    if sampler_hash == "de52fc2c5b0e37b84af00aa264049f0ab314c38852ad0b407b593cdce1a480f9":
+        compatible = {sampler_hash, file_hash(ppo_file),
+                      "b96144ea2f74bdd4bae40747d4b494d810466032cf0d29840b2f3d9a8a7ab597"}
+        if code.get(ppo_name) in compatible and actual.get(ppo_name) in compatible:
+            code[ppo_name] = actual[ppo_name]
+    return saved == expected | {"code": code}
+
+
+def prefix_sampling_code_hash(path) -> str:
+    from hashlib import sha256
+
+    source = path.read_bytes().replace(b"\r\n", b"\n")
+    sampler = source.split(b"\ndef sample_positions(", 1)[1].split(b"\ndef split_topics(", 1)[0]
+    return sha256(sampler).hexdigest()
+
+
+def load_or_prepare_prefix_warmup(root, config: PPOConfig, folder) -> tuple[dict, dict]:
+    """Читаю подходящий буфер разогрева или один раз считаю его по сохранённым эпизодам."""
+    from pathlib import Path
+
+    import torch
+
+    from ..tasks import load_tasks
+    from .common import file_hash
+    from .ppo import load_warmup_episodes
+
+    root, folder = Path(root), Path(folder)
+    episodes_path = folder / "episodes.jsonl"
+    if not episodes_path.is_file():
+        raise FileNotFoundError(f"сначала нужна генерация разогрева: {episodes_path}")
+    tasks_path = root / "data" / "tasks" / "tasks.json"
+    points_path = root / "data" / "tasks" / "key_points" / "key_points.json"
+    src = root / "src" / "presentation_rl"
+    score_files = ("dsl.py", "environment.py", "perturb.py", "rewards.py", "key_points.py",
+                   "rendering/builder.py", "training/common.py")
+    code = {name: file_hash(src / name) for name in score_files}
+    code["training/prefix_features.py"] = prefix_warmup_code_hash()
+    code["training/ppo.py"] = prefix_sampling_code_hash(src / "training" / "ppo.py")
+    provenance = {
+        "episodes": file_hash(episodes_path), "tasks": file_hash(tasks_path), "points": file_hash(points_path),
+        "code": code, "model": config.policy_model, "revision": config.policy_revision,
+        "max_new_tokens": config.max_new_tokens, "max_context": config.max_context,
+        "reward_floor": config.reward_floor, "max_positions": config.warmup_max_positions,
+        "embedder_device": config.embedder_device, "seed": config.seed, "feature_names": list(FEATURE_NAMES),
+    }
+    cache = folder / "prefix_features.pt"
+    if cache.is_file():
+        saved = torch.load(cache, map_location="cpu", weights_only=True)
+        if prefix_cache_matches(saved["provenance"], provenance):
+            print(f"читаю готовые префиксные признаки: {cache}", flush=True)
+            return saved["data"], provenance
+
+    from transformers import AutoTokenizer
+
+    episodes = load_warmup_episodes(folder)
+    tasks = {task.id: task for task in load_tasks(tasks_path)}
+    tokenizer = AutoTokenizer.from_pretrained(config.policy_model, revision=config.policy_revision)
+    reward = RewardModel(root, device=config.embedder_device, floor=config.reward_floor)
+    extract = PrefixFeatureExtractor(tokenizer, reward, max_new_tokens=config.max_new_tokens,
+                                     max_context=config.max_context)
+    data = prepare_prefix_warmup(episodes, tasks, extract, config)
+    temporary = cache.with_suffix(".pt.tmp")
+    torch.save({"provenance": provenance, "data": data}, temporary)
+    temporary.replace(cache)
+    return data, provenance
+
+
+def prefix_scaler_tensors(scaler: dict):
+    """Проверяю порядок столбцов и возвращаю параметры нормировки на CPU."""
+    import torch
+
+    if scaler.get("names") != list(FEATURE_NAMES):
+        raise ValueError("порядок префиксных признаков изменился")
+    mean = torch.tensor(scaler["mean"], dtype=torch.float32)
+    scale = torch.tensor(scaler["scale"], dtype=torch.float32)
+    shape = (len(FEATURE_NAMES),)
+    if mean.shape != shape or scale.shape != shape or not (mean.isfinite().all() and scale.isfinite().all()
+                                                          and (scale > 0).all()):
+        raise ValueError("некорректная нормировка префиксных признаков")
+    return mean, scale

@@ -1,14 +1,14 @@
-# Здесь подключаем PPO поверх training/common.py: критик-голова на опорной модели, разогрев, GAE, два прохода, цикл.
-"""PPO с критиком-головой на скрытых состояниях опорной T-lite (``docs/ppo.md``).
+# Здесь подключаем PPO поверх training/common.py: разогрев критиков, GAE, два прохода политики и цикл.
+"""PPO с критиком на префиксных признаках или скрытых состояниях опорной T-lite.
 
-Шаг: 8 заданий × 8 эпизодов (как у GRPO) → награда → проход 0 (опорная модель без адаптера: log p для KL и признаки
-критика в позициях действий) → V_old, преимущества GAE (γ = λ = 1: A = R − V_old), нормировка по токенам шага →
-обучение головы (одна эпоха по признакам шага) → проход 1 политики (ρ = 1, старые log p сохраняются) → шаг
-оптимизатора → проход 2 (отсечение ε, KL k2 с весом sg(ρ)) → шаг оптимизатора → адаптер в vLLM.
+Шаг: 8 заданий × 8 эпизодов (как у GRPO) → подготовка награды, признаков и опорных log p → V_old, преимущества
+GAE (γ = λ = 1: A = R − V_old), нормировка по токенам шага → обучение критика → проход 1 политики
+(ρ = 1, старые log p сохраняются) → шаг оптимизатора → проход 2 (отсечение ε, KL k2 с весом sg(ρ)) →
+шаг оптимизатора → адаптер в vLLM.
 
 Разогрев (до основного запуска, у каждого сида свой): эпизоды исходной модели из отдельной очереди, признаки
 в случайной выборке позиций, регрессия головы на итоговую награду. Выбор вида головы и числа эпох — EXP-028
-(``notebooks/ppo.ipynb``). Части без torch (GAE, нормировка, меры критика, выборка позиций, деление по темам)
+(``notebooks/ppo_exp028_v2.ipynb``). Части без torch (GAE, нормировка, меры критика, выборка позиций, деление по темам)
 проверяются в ``tests/test_ppo.py``; части с torch — в ``tests/test_ppo_torch.py`` на крошечной модели (на сервере).
 
 Общий код (``common.py``, ``grpo.py``) не меняется: его хеши проверяет продолжение уже идущих запусков GRPO.
@@ -23,15 +23,16 @@ import random
 import shutil
 import statistics
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
 from .common import (Job, Journal, RLConfig, Rollout, RewardModel, TaskQueue, add_session, check_resume, collect,
                      copy_snapshot, episode_prompt, export_adapter, file_hash, fixed_validation_topics, kl_terms,
-                     load_policy, mismatch_exceeded, mismatch_stats, mode_task, new_run_dir, save_episodes,
+                      load_policy, mismatch_exceeded, mismatch_stats, mode_task, new_run_dir, read_journal, save_episodes,
                      sequence_logprobs, setup_torch, stable_seed, start_manifest, stop_ids, summarize, target_positions,
                      vllm_generator, write_json)
-from .grpo import RunStopped, cancel_after, fmt, latest_state, validate, wiki_contact
+from .grpo import RunStopped, cancel_after, fmt, validate, wiki_contact
 
 POSITIONS = ("first", "q25", "q50", "q75", "last")  # описательные срезы ответа (docs/ppo.md, раздел 16)
 
@@ -141,6 +142,9 @@ def critic_metrics(values: list[list[float]], rewards: list[float], modes: list[
     pairs = [(v, r) for vs, r in zip(values, rewards) for v in vs]
     block("all", pairs)
     out["all_mse_const"] = statistics.fmean((r - constant) ** 2 for _, r in pairs) if pairs else None
+    if mode_means and pairs:
+        out["all_mse_mode"] = sum(len(vs) * (r - mode_means[m]) ** 2
+                                  for vs, r, m in zip(values, rewards, modes)) / len(pairs)
     for mode in sorted(set(modes)):
         rows = [(v, r) for vs, r, m in zip(values, rewards, modes) if m == mode for v in vs]
         block(f"{mode}_all", rows)
@@ -276,11 +280,11 @@ def head_values(head, features, device: str, chunk: int = 4096) -> list[float]:
 
 
 def reference_pass(model, ids: list[int], mask: list[int], temperature: float, chunk: int = 1024,
-                   keep: list[int] | None = None, logp: bool = True):
+                   keep: list[int] | None = None, logp: bool = True, *, return_features: bool = True):
     """Проход 0 по эпизоду: опорная модель (адаптер выключен, ``eval``, без градиента). Возвращает log p опорной
     модели в позициях действий (на процессоре, float32; None при ``logp=False``) и признаки критика —
     ``last_hidden_state`` в позиции p − 1 для действия в позиции p (на процессоре, float16; ``keep`` — номера
-    действий, иначе все). Режим модели после прохода восстанавливается."""
+    действий, иначе все). При ``return_features=False`` признаки не копируются на CPU. Режим модели восстанавливается."""
     import torch
 
     from .common import _chunk_logprobs, backbone_and_head
@@ -288,7 +292,7 @@ def reference_pass(model, ids: list[int], mask: list[int], temperature: float, c
     device = next(model.parameters()).device
     positions_all = target_positions(mask)
     if not positions_all:
-        return (torch.zeros(0) if logp else None), torch.zeros((0, 0), dtype=torch.float16)
+        return (torch.zeros(0) if logp else None), (torch.zeros((0, 0), dtype=torch.float16) if return_features else None)
     was_training = model.training
     model.eval()
     try:
@@ -306,9 +310,10 @@ def reference_pass(model, ids: list[int], mask: list[int], temperature: float, c
                 parts = [_chunk_logprobs(states[s:s + chunk], targets[s:s + chunk], head.weight, temperature)[0]
                          for s in range(0, len(positions_all), chunk)]
                 ref = torch.cat(parts).float().cpu()
-            chosen = states if keep is None else states.index_select(0, torch.tensor(keep, device=device))
-            features = chosen.to(torch.float16).cpu()
-            del states, chosen
+            features = None
+            if return_features:
+                chosen = states if keep is None else states.index_select(0, torch.tensor(keep, device=device))
+                features = chosen.to(torch.float16).cpu()
     finally:
         model.train(was_training)
     return ref, features
@@ -638,15 +643,68 @@ def save_warmup(folder: Path, fitted: dict, config: PPOConfig, extra: dict | Non
     import torch
 
     folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "head.pt"
+    tmp = path.with_suffix(".pt.tmp")
     torch.save({"head": fitted["head"].state_dict(), "optimizer": fitted["optimizer"].state_dict(),
                 "kind": fitted["kind"], "lr": fitted["lr"], "constant": fitted["constant"],
-                "hidden": config.head_hidden}, folder / "head.pt")
+                "hidden": config.head_hidden, "mode_means": fitted.get("mode_means"),
+                "feature_scaler": fitted.get("feature_scaler"), "input_dim": fitted.get("input_dim")}, tmp)
+    tmp.replace(path)
     write_json(folder / "head.json", {k: v for k, v in fitted.items() if k not in ("head", "optimizer")}
                | (extra or {}) | {"head_sha256": file_hash(folder / "head.pt")})
     return folder / "head.pt"
 
 
 # --------------------------------------------------------------------------- цикл обучения
+
+
+def _prepare_critic_inputs(model, jobs, rollouts: list[Rollout], config: PPOConfig, reward,
+                           extract=None, scaling=None, *, overlap: bool = False) -> tuple:
+    """Готовлю награды, признаки и опорные log p. При двух GPU совмещаю независимые фазы."""
+    import torch
+
+    timings = {}
+
+    def score_batch():
+        began = time.monotonic()
+        for job, rollout in zip(jobs, rollouts):
+            reward(job.task, rollout)
+        rewards = [r.reward for r in rollouts]
+        if any(not math.isfinite(r) for r in rewards):
+            raise RunStopped("неконечная награда в шаге")
+        timings["reward"] = time.monotonic() - began
+        began = time.monotonic()
+        features = []
+        if extract is not None:
+            mean, scale = scaling
+            for job, rollout in zip(jobs, rollouts):
+                values = extract(job.task, rollout.ids, rollout.mask).values
+                features.append((torch.from_numpy(values) - mean) / scale)
+        timings["prefix_features"] = time.monotonic() - began if extract is not None else 0.0
+        return rewards, features
+
+    def reference_batch():
+        began = time.monotonic()
+        refs, features = [], []
+        for rollout in rollouts:
+            ref, x = reference_pass(model, rollout.ids, rollout.mask, config.temperature, config.logits_chunk,
+                                    return_features=extract is None)
+            refs.append(ref)
+            if x is not None:
+                features.append(x)
+        timings["pass0"] = time.monotonic() - began
+        return refs, features
+
+    if overlap:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(score_batch)
+            refs, hidden = reference_batch()
+            rewards, prefix = future.result()
+    else:
+        rewards, prefix = score_batch()
+        refs, hidden = reference_batch()
+    return rewards, refs, prefix if extract is not None else hidden, timings
 
 def save_state(run_dir: Path, step: int, model, optimizer, scaler, head, head_opt, queue: TaskQueue, counters: dict,
                keep: int) -> Path:
@@ -678,6 +736,13 @@ def ppo_code_hash(root: str | Path) -> str:
     return file_hash(Path(root) / "src" / "presentation_rl" / "training" / "ppo.py")
 
 
+def latest_ppo_state(run_dir: Path) -> Path | None:
+    states = (run_dir / "state").glob("step_*")
+    complete = [p for p in states if p.name.removeprefix("step_").isdigit()
+                and (p / "state.json").is_file() and (p / "training.pt").is_file() and (p / "adapter").is_dir()]
+    return max(complete, key=lambda p: int(p.name.removeprefix("step_")), default=None)
+
+
 def progress(step: int, seconds: float, stats: dict, critic: dict, rollouts: list[Rollout], counters: dict,
              config: PPOConfig) -> None:
     summary = summarize(rollouts)
@@ -700,6 +765,7 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
     from ..tools.cache import WikiCache
     from ..tools.wiki import WikiClient
     from ..tools.wiki_tools import WikiTools
+    from .prefix_features import PrefixFeatureExtractor, prefix_scaler_tensors
     from .vllm_client import VLLMClient
 
     root = Path(root).resolve()
@@ -712,12 +778,17 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
     if not config.warmup_dir:
         raise ValueError("нужен config.warmup_dir — папка разогрева этого сида с head.pt")
     warmup_file = Path(config.warmup_dir) / "head.pt"
+    warmup_hash = file_hash(warmup_file)
+    warm = torch.load(warmup_file, map_location="cpu", weights_only=True)
+    scaling = prefix_scaler_tensors(warm["feature_scaler"]) if warm.get("feature_scaler") is not None else None
+    prefix_code = file_hash(Path(__file__).with_name("prefix_features.py")) if scaling is not None else None
 
     if run_dir is None:
         run_dir = new_run_dir(config, root)
         manifest = start_manifest(run_dir, config, root, {
             "validation_topics": val_topics, "vllm_version": client.version(), "ppo_code": ppo_code_hash(root),
-            "warmup": {"dir": str(config.warmup_dir), "head_sha256": file_hash(warmup_file),
+            "prefix_code": prefix_code,
+            "warmup": {"dir": str(config.warmup_dir), "head_sha256": warmup_hash,
                        "info": json.loads((Path(config.warmup_dir) / "head.json").read_text(encoding="utf-8"))}})
         state_dir, start = None, 0
     else:
@@ -726,7 +797,9 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
         check_resume(manifest, config, root)
         if manifest.get("ppo_code") != ppo_code_hash(root):
             raise ValueError("код PPO изменился — это новый запуск, а не продолжение")
-        state_dir = latest_state(run_dir)
+        if manifest.get("prefix_code") != prefix_code or manifest["warmup"]["head_sha256"] != warmup_hash:
+            raise ValueError("изменились признаки или разогрев критика — это новый запуск")
+        state_dir = latest_ppo_state(run_dir)
         start = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))["step"] if state_dir else 0
     session = add_session(run_dir, manifest, start, root, {"vllm_version": client.version(),
                                                            "wiki_proxy": os.environ.get("WIKI_PROXY", "")})
@@ -742,9 +815,11 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
     optimizer = torch.optim.AdamW(trainable, lr=config.learning_rate, betas=tuple(config.betas), eps=config.eps,
                                   weight_decay=config.weight_decay)
     scaler = torch.amp.GradScaler("cuda")
-    warm = torch.load(warmup_file, weights_only=False)
     head_cfg = dataclasses.replace(config, head=warm["kind"], head_lr=warm["lr"])
-    head = make_head(warm["kind"], model.config.hidden_size, warm["hidden"], 0.0).to(config.head_device)
+    dim = scaling[0].numel() if scaling is not None else model.config.hidden_size
+    if scaling is not None and warm.get("input_dim") != dim:
+        raise ValueError("размер входа сохранённого критика не совпадает с префиксными признаками")
+    head = make_head(warm["kind"], dim, warm["hidden"], 0.0).to(config.head_device)
     head.load_state_dict(warm["head"])
     head_opt = head_optimizer(head, head_cfg)
     head_opt.load_state_dict(warm["optimizer"])
@@ -765,6 +840,12 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
         counters.update(state["counters"])
 
     reward = reward or RewardModel(root, device=config.embedder_device, floor=config.reward_floor)
+    extract = (PrefixFeatureExtractor(tokenizer, reward, max_new_tokens=config.max_new_tokens,
+                                      max_context=config.max_context) if scaling is not None else None)
+    device = next(model.parameters()).device
+    overlap = (extract is not None and device.type == "cuda" and config.embedder_device.startswith("cuda:")
+               and torch.device(config.embedder_device) != device)
+    mode_means = warm.get("mode_means") if extract is not None else None
     prompt, stops = episode_prompt(tokenizer), stop_ids(tokenizer)
     adapters = run_dir / "adapters"
     adapters.mkdir(exist_ok=True)
@@ -798,22 +879,13 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
                                lambda job: vllm_generator(client, current, config.temperature, stops, job.seed_parts),
                                lambda: WikiTools(cache, max_calls=config.max_calls), config)
             generated = time.monotonic()
-            for job, rollout in zip(jobs, rollouts):
-                reward(job.task, rollout)
-            rewards = [r.reward for r in rollouts]
-            if any(not math.isfinite(r) for r in rewards):
-                raise RunStopped("неконечная награда в шаге")
-            rewarded = time.monotonic()
-
-            # проход 0: опорная модель — log p для KL и признаки; V_old одной неизменной головой
-            refs, features = [], []
-            for rollout in rollouts:
-                ref, f = reference_pass(model, rollout.ids, rollout.mask, config.temperature, config.logits_chunk)
-                refs.append(ref)
-                features.append(f)
+            rewards, refs, features, prep_times = _prepare_critic_inputs(
+                model, jobs, rollouts, config, reward, extract, scaling, overlap=overlap,
+            )
             values = [head_values(head, f, config.head_device) for f in features]
             modes = [r.mode for r in rollouts]
-            critic_before = critic_metrics(values, rewards, modes, counters["last_mean_reward"])
+            baseline = warm["constant"] if extract is not None else counters["last_mean_reward"]
+            critic_before = critic_metrics(values, rewards, modes, baseline, mode_means)
             raw, targets = zip(*(gae(v, r, config.gae_lambda) for v, r in zip(values, rewards)))
             normalized, advantage_stats = normalize(list(raw), config.std_floor)
             prepared = time.monotonic()
@@ -821,7 +893,7 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
             head_stats = train_head(head, head_opt, features, list(targets), head_cfg, config.head_epochs_step,
                                     stable_seed(config.seed, "head-order", step))
             after = [head_values(head, f, config.head_device) for f in features]
-            critic_after = critic_metrics(after, rewards, modes, counters["last_mean_reward"])
+            critic_after = critic_metrics(after, rewards, modes, baseline, mode_means)
             del features, after
             criticized = time.monotonic()
 
@@ -842,23 +914,26 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
             counters["seconds"] += published - began
             counters["network_seconds"] += cache.network_seconds - network_before
             counters["last_mean_reward"] = statistics.fmean(rewards)
-            journals["steps"].write({
+            step_stats = {
                 "step": step, "tasks": batch, "advantage": advantage_stats, **stats,
                 "critic_before": critic_before, "critic_after": critic_after, **head_stats,
                 "values": {"mean": statistics.fmean(v for vs in values for v in vs) if any(values) else None},
                 **summarize(rollouts),
-                "seconds": {"generation": generated - began, "reward": rewarded - generated,
-                            "pass0": prepared - rewarded, "head": criticized - prepared, "train": trained - criticized,
+                "seconds": {"generation": generated - began, **prep_times, "prepare_wall": prepared - generated,
+                             "head": criticized - prepared, "train": trained - criticized,
                             "adapter": published - trained, "network": cache.network_seconds - network_before},
+                "preparation_overlapped": overlap,
                 "counters": dict(counters), "queue": queue.state(),
                 "embedder_oom_retries": getattr(getattr(reward, "embedder", None), "oom_retries", None),
-            })
+            }
             progress(step, published - began, stats, critic_before, rollouts, counters, config)
             if counters["skipped"] > config.max_skipped_updates * config.ppo_epochs * step:
                 journals["events"].write({"type": "warning", "step": step,
                                           "message": f"пропущено обновлений {counters['skipped']}"})
 
+            step_stats["seconds"]["validation"] = 0.0
             if step % config.eval_every == 0 or step == config.steps:
+                validating = time.monotonic()
                 folder = run_dir / "checkpoints" / f"step_{step:04d}"
                 if folder.exists():
                     shutil.rmtree(folder)
@@ -873,14 +948,131 @@ def train(config: PPOConfig, root: str | Path = ".", run_dir: str | Path | None 
                       f"без {fmt(summary.get('plain_reward'))}", flush=True)
                 write_json(folder / "done.json", {"step": step, "session": session,
                                                   "time": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                step_stats["seconds"]["validation"] = time.monotonic() - validating
+            checkpointing = time.monotonic()
+            # Сначала журнал: если сохранение оборвётся, продолжение отменит запись этого шага.
+            journals["steps"].write(step_stats)
             if step % config.save_every == 0 or step % config.eval_every == 0 or step == config.steps:
                 save_state(run_dir, step, model, optimizer, scaler, head, head_opt, queue, counters,
                            config.keep_states)
+                journals["events"].write({"type": "saved", "step": step,
+                                          "seconds": time.monotonic() - checkpointing})
     except BaseException as error:
         journals["events"].write({"type": "stopped", "at_step": step, "error": repr(error)[:2000]})
         raise
     journals["events"].write({"type": "finished", "step": config.steps})
     return run_dir
+
+
+PREFIX_CRITICS = {
+    "linear": {"label": "Линейный критик на префиксных признаках", "epochs": 4, "hidden": 0, "lr": 1e-3},
+    "mlp": {"label": "Критик с MLP на префиксных признаках", "epochs": 2, "hidden": 64, "lr": 1e-3},
+}
+
+
+def prepare_prefix_critics(config: PPOConfig, root: str | Path, kinds: tuple[str, ...]) -> dict[str, PPOConfig]:
+    """Сохраняю разогрев каждого варианта отдельно. Оба варианта читают один буфер этого сида."""
+    import torch
+
+    from .prefix_features import fit_prefix_head, load_or_prepare_prefix_warmup
+
+    root = Path(root).resolve()
+    folder = root / "runs" / "ppo" / f"warmup_seed{config.seed}"
+    for kind in kinds:
+        if kind not in PREFIX_CRITICS:
+            raise ValueError(f"неизвестный вариант критика: {kind}")
+    data, provenance = load_or_prepare_prefix_warmup(root, config, folder)
+    configs = {}
+    for kind in kinds:
+        settings = PREFIX_CRITICS[kind]
+        saved = folder / f"prefix_{kind}"
+        cfg = dataclasses.replace(config, head=kind, head_hidden=settings["hidden"], head_lr=settings["lr"],
+                                  head_device="cpu", warmup_epochs=settings["epochs"], warmup_dir=str(saved))
+        manifest = {"seed": config.seed, "settings": settings, "provenance": provenance,
+                    "head_batch": cfg.head_batch, "head_betas": list(cfg.head_betas),
+                    "head_eps": cfg.head_eps, "head_weight_decay": cfg.head_weight_decay,
+                    "head_grad_clip": cfg.head_grad_clip}
+        path, info_path = saved / "head.pt", saved / "head.json"
+        info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.is_file() else {}
+        if path.is_file() and info.get("prefix_warmup") == manifest and info.get("head_sha256") == file_hash(path):
+            print(f"читаю разогретый критик: {settings['label']} · {saved}", flush=True)
+        else:
+            started = time.monotonic()
+            fit = fit_prefix_head(data, cfg, None, cfg.head_lr, kind=kind, epochs=cfg.warmup_epochs)
+            save_warmup(saved, fit, cfg, {"prefix_warmup": manifest, "episodes": len(data["rewards"])})
+            print(f"разогретый критик: {settings['label']} · {time.monotonic() - started:.1f} с · {saved}",
+                  flush=True)
+        configs[kind] = cfg
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return configs
+
+
+def _pilot_step_seconds(row: dict) -> float:
+    times = row["seconds"]
+    # Награда, признаки префикса и проход 0 частично параллельны. Считаю их по общему времени.
+    return sum(times[k] for k in ("generation", "prepare_wall", "head", "train", "adapter", "validation"))
+
+
+def _pilot_summary(run_dir: Path, config: PPOConfig) -> dict:
+    steps = [r for r in read_journal(run_dir / "steps.jsonl") if "critic_before" in r]
+    val = [r for r in read_journal(run_dir / "validation.jsonl") if r.get("step") == config.steps]
+    saved = [r["seconds"] for r in read_journal(run_dir / "events.jsonl") if r.get("type") == "saved"]
+    if [r["step"] for r in steps] != list(range(1, config.steps + 1)) or len(val) != 1:
+        raise ValueError(f"неполный журнал пилота: {run_dir}")
+    totals = [_pilot_step_seconds(r) for r in steps]
+    return {
+        "run_dir": str(run_dir), "time_seconds": sum(totals) + sum(saved),
+        "mean_step_seconds": statistics.fmean(total - r["seconds"]["validation"] for total, r in zip(totals, steps)),
+        "mean_prefix_seconds": statistics.fmean(r["seconds"]["prefix_features"] for r in steps),
+        "peak_memory_gb": max(r["peak_memory_gb"] for r in steps),
+        "skipped_updates": sum(r["skipped"] for r in steps),
+        "critic_before": {key: statistics.fmean(r["critic_before"][key] for r in steps)
+                          for key in ("all_mse", "all_mse_const", "all_mse_mode", "first_mse", "first_mse_mode")},
+        "mean_clip_active": statistics.fmean(r["passes"][-1]["clip_active"] for r in steps),
+        "max_kl_old_new": max((r["kl_old_new_k3"] for r in steps if r["kl_old_new_k3"] is not None), default=None),
+        "validation": val[0], "steps": steps,
+    }
+
+
+def run_prefix_pilots(config: PPOConfig, root: str | Path, client, steps: int = 5) -> dict:
+    """Два пилота сида 0 с общего старта. Повторный запуск продолжает незавершённый пилот."""
+    import torch
+
+    if steps < 1:
+        raise ValueError("число шагов пилота должно быть положительным")
+    root = Path(root).resolve()
+    configs = prepare_prefix_critics(dataclasses.replace(config, seed=0), root, tuple(PREFIX_CRITICS))
+    folder = Path("runs") / "ppo_pilot" / f"prefix_{steps}_steps"
+    report = {}
+    for kind, cfg in configs.items():
+        target = folder / kind
+        pilot = dataclasses.replace(cfg, steps=steps, eval_every=steps, save_every=1, runs_dir=str(target))
+        existing = sorted(p.parent for p in (root / target).glob("*/manifest.json"))
+        run = existing[-1] if existing else None
+        if run is not None:
+            manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
+            check_resume(manifest, pilot, root)
+            if (manifest.get("ppo_code") != ppo_code_hash(root)
+                    or manifest.get("prefix_code") != file_hash(Path(__file__).with_name("prefix_features.py"))
+                    or manifest["warmup"]["head_sha256"] != file_hash(Path(pilot.warmup_dir) / "head.pt")):
+                raise ValueError(f"изменились код или разогрев пилота в {run}")
+        state = latest_ppo_state(run) if run is not None else None
+        finished = state and json.loads((state / "state.json").read_text(encoding="utf-8"))["step"] == steps
+        print(f"{PREFIX_CRITICS[kind]['label']} · {steps} шагов", flush=True)
+        if not finished:
+            run = train(pilot, root, run_dir=run, client=client)
+        report[kind] = _pilot_summary(run, pilot)
+        for name in client.models():
+            if name.startswith(run.name + "_"):
+                client.unload_lora(name)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    schedules = [[row["tasks"] for row in arm["steps"]] for arm in report.values()]
+    if any(schedule != schedules[0] for schedule in schedules[1:]):
+        raise ValueError("очереди заданий в двух пилотах различаются")
+    write_json(root / folder / "comparison.json", report)
+    return report
 
 
 # --------------------------------------------------------------------------- проверка памяти
