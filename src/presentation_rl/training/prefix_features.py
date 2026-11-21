@@ -221,20 +221,35 @@ def prepare_prefix_warmup(episodes: Sequence[dict], tasks: Mapping[str, Task],
     return data
 
 
-def fit_prefix_head(data: dict, config: PPOConfig, holdout: set[str], lr: float = 1e-3) -> dict:
-    """Проверяю Z-lin на отложенных темах. Масштабы и обе константы беру из обучающей части."""
+def fit_prefix_head(data: dict, config: PPOConfig, holdout: set[str], lr: float = 1e-3, *,
+                    kind: str = "linear", reference: Sequence | None = None, use_prefix: bool = True) -> dict:
+    """Проверяю голову на Z, на T-lite или на обоих наборах признаков."""
     import torch
 
     from .ppo import fit_warmup_head, head_values, paired_improvement
 
-    train = [x for x, topic in zip(data["features"], data["tasks"]) if topic not in holdout]
+    train = [i for i, topic in enumerate(data["tasks"]) if topic not in holdout]
     if not train or len(train) == len(data["features"]):
         raise ValueError("нужны непустые обучающая и отложенная части")
-    scale, mean = torch.std_mean(torch.cat(train), dim=0, unbiased=False)
-    scale = torch.where(scale > 1e-8, scale, 1.0)
-    data = data | {"features": [(x - mean) / scale for x in data["features"]]}
-    fit = fit_warmup_head(data, config, "linear", lr, holdout)
-    fit["feature_scaler"] = {"mean": mean.tolist(), "scale": scale.tolist(), "names": data["feature_names"]}
+    if not use_prefix and reference is None:
+        raise ValueError("для головы на T-lite нужны признаки опорной модели")
+    if reference is not None and len(reference) != len(data["features"]):
+        raise ValueError("буферы признаков содержат разное число эпизодов")
+
+    scaler = None
+    if use_prefix:
+        scale, mean = torch.std_mean(torch.cat([data["features"][i] for i in train]), dim=0, unbiased=False)
+        scale = torch.where(scale > 1e-8, scale, 1.0)
+        features = [(x - mean) / scale for x in data["features"]]
+        scaler = {"mean": mean.tolist(), "scale": scale.tolist(), "names": data["feature_names"]}
+        if reference is not None:
+            features = [torch.cat((h, z), dim=1) for h, z in zip(reference, features)]
+    else:
+        features = list(reference)
+    data = data | {"features": features}
+    fit = fit_warmup_head(data, config, kind, lr, holdout)
+    fit["feature_scaler"] = scaler
+    fit["input_dim"] = features[0].shape[1]
 
     errors_by_mode: dict[str, list[tuple[int, float]]] = {}
     paired_rows = []
@@ -253,3 +268,46 @@ def fit_prefix_head(data: dict, config: PPOConfig, holdout: set[str], lr: float 
     all_rows = [row for rows in errors_by_mode.values() for row in rows]
     metrics["all_mse_mode"] = sum(n * error for n, error in all_rows) / sum(n for n, _ in all_rows)
     return fit
+
+
+def aligned_reference_features(data: dict, reference: dict, episodes: Sequence[dict], revision: str) -> list:
+    """Проверяю, что признаки T-lite и Z относятся к одним эпизодам и действиям."""
+    ids_hash = [stable_seed(*e["ids"]) for e in sorted(episodes, key=lambda e: e["step"]) if any(e["mask"][1:])]
+    for name in ("positions", "counts", "rewards", "tasks", "modes"):
+        if reference.get(name) != data[name]:
+            raise ValueError(f"буферы T-lite и Z расходятся по {name}")
+    if reference.get("ids_hash") != ids_hash or reference.get("revision") != revision:
+        raise ValueError("буфер T-lite рассчитан по другим токенам или ревизии модели")
+    if reference.get("layer") != "last_hidden_state":
+        raise ValueError("в буфере T-lite нужен последний скрытый слой")
+    features = reference.get("features", [])
+    if len(features) != len(data["positions"]) or any(
+        h.ndim != 2 or len(h) != len(pos) for h, pos in zip(features, data["positions"])
+    ):
+        raise ValueError("не совпадают размеры буферов T-lite и Z")
+    return features
+
+
+def prefix_warmup_code_hash() -> str:
+    """Отпечаток извлечения Z и выбора позиций. Изменения в обучении голов на него не влияют."""
+    from hashlib import sha256
+    from pathlib import Path
+
+    source = Path(__file__).read_bytes().replace(b"\r\n", b"\n")
+    return sha256(source.split(b"\ndef fit_prefix_head(", 1)[0]).hexdigest()
+
+
+def prefix_cache_matches(saved: dict, expected: dict) -> bool:
+    """Принимаю старый буфер Z из 5780238 только при том же извлечении и тех же входах."""
+    if saved == expected:
+        return True
+    name = "training/prefix_features.py"
+    saved_hash = saved.get("code", {}).get(name)
+    if expected["code"][name] != "26bbaf61c5d797548d7cc0ba0023488eecba83446cfb352e5add7eb9a74658c9":
+        return False
+    if saved_hash not in {
+        "78a89104d2b58f4f44df1bd790d61f787a906f7fcd82d4da16f027fb3d939cde",
+        "cf37cf026ec8b0eb814d16c931f4d75e6aad0ac93d7d3a48e0208cdead8bff71",
+    }:
+        return False
+    return saved == expected | {"code": expected["code"] | {name: saved_hash}}
